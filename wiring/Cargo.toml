@@ -1,7 +1,7 @@
 [package]
-name = "wiring_one"
+name = "wiring"
 version = "0.1.0"
-authors = ["Charlotte Godley <charlotte.godley@hotmail.co.uk>"]
+authors = ["Phil Willis <ptbw@hotmail.com>"]
 
 [dependencies]
 wiringpi = "0.2"
