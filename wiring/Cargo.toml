@@ -1,0 +1,8 @@
+[package]
+name = "wiring_one"
+version = "0.1.0"
+authors = ["Charlotte Godley <charlotte.godley@hotmail.co.uk>"]
+
+[dependencies]
+wiringpi = "0.2"
+gilrs = "0.6.1"
