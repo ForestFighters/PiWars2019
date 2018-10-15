@@ -1,4 +1,4 @@
-extern crate rust_pigpio;
+//extern crate rust_pigpio;
 extern crate i2cdev;
 extern crate byteorder;
 
@@ -12,11 +12,11 @@ const VL53L0X_REG_PRE_RANGE_CONFIG_VCSEL_PERIOD: u8	 	= 0x50;
 const VL53L0X_REG_FINAL_RANGE_CONFIG_VCSEL_PERIOD: u8 	= 0x70;
 const VL53L0X_REG_SYSRANGE_START: u8					= 0x00;
 
-const VL53L0X_REG_RESULT_INTERRUPT_STATUS: u8			= 0x13;
+//const VL53L0X_REG_RESULT_INTERRUPT_STATUS: u8			= 0x13;
 const VL53L0X_REG_RESULT_RANGE_STATUS: 	u8				= 0x14;
 
 
-const address: u16										= 0x29;
+const ADDRESS: u16										= 0x29;
 
 
 fn main() {
@@ -24,7 +24,7 @@ fn main() {
     println!("Hello, Amy! How are you, today?");
     
     let bus = "/dev/i2c-1";
-    let mut tof = LinuxI2CDevice::new(bus,address).unwrap();
+    let mut tof = LinuxI2CDevice::new(bus,ADDRESS).unwrap();
     
     let phalanges = tof.smbus_read_byte_data(VL53L0X_REG_IDENTIFICATION_REVISION_ID).unwrap();
    
@@ -40,7 +40,8 @@ fn main() {
 	let range = tof.smbus_read_byte_data(VL53L0X_REG_FINAL_RANGE_CONFIG_VCSEL_PERIOD).unwrap();
 	println!("FINAL_RANGE_CONFIG_VCSEL_PERIOD = {0}",range);
 
-	let start = tof.smbus_write_byte_data(VL53L0X_REG_SYSRANGE_START, 0x01).unwrap();
+	let _start = tof.smbus_write_byte_data(VL53L0X_REG_SYSRANGE_START, 0x01);
+	
  
 	let mut cnt = 0;
 	let mut status = tof.smbus_read_byte_data(VL53L0X_REG_RESULT_RANGE_STATUS).unwrap();
@@ -61,14 +62,14 @@ fn main() {
 		println!( "not ready");
 	}
 
-	//let data = bus.read_i2c_block_data(address, 0x14, 12)
-	//print data
-	//print "ambient count " + str(makeuint16(data[7], data[6]))
-	//print "signal count " + str(makeuint16(data[9], data[8]))
-	//print "distance " + str(makeuint16(data[11], data[10]))
+	let data = tof.smbus_read_i2c_block_data(VL53L0X_REG_RESULT_RANGE_STATUS, 12).unwrap();
+	println!("{:#?}",data);
+	println!("ambient count {:#?}",data[7] << 8 + data[6]);
+	println!("signal count {:#?}",data[9] << 8 + data[8]);
+	println!("distance {:#?}",data[11] << 8 + data[10]);
 
-	//DeviceRangeStatusInternal = ((data[0] & 0x78) >> 3)
-	//print DeviceRangeStatusInternal
+	let device_range_status_internal = (data[0] & 0x78) >> 3;
+	println!("{0}",device_range_status_internal);
 	
 	println! ("Amy is the best unicorn (sorry Chloe)");
 
