@@ -40,19 +40,17 @@ fn main() {
 	let range = tof.smbus_read_byte_data(VL53L0X_REG_FINAL_RANGE_CONFIG_VCSEL_PERIOD).unwrap();
 	println!("FINAL_RANGE_CONFIG_VCSEL_PERIOD = {0}",range);
 
-	let _start = tof.smbus_write_byte_data(VL53L0X_REG_SYSRANGE_START, 0x01);
-	
- 
-	let mut cnt = 0;
 	loop {
+		let mut cnt = 0;
+		let _start = tof.smbus_write_byte_data(VL53L0X_REG_SYSRANGE_START, 0x01);
 		let mut status = tof.smbus_read_byte_data(VL53L0X_REG_RESULT_RANGE_STATUS).unwrap();
 		loop {
-			// 1 second waiting time max
-			thread::sleep(interval);    
-			status = tof.smbus_read_byte_data(VL53L0X_REG_RESULT_RANGE_STATUS).unwrap();
 			if (status & 0x01) == 0x01 || cnt >= 100  {
 				break;
 			}
+			// 1 second waiting time max
+			thread::sleep(interval);    
+			status = tof.smbus_read_byte_data(VL53L0X_REG_RESULT_RANGE_STATUS).unwrap();
 			cnt += 1;
 		}
 
@@ -65,13 +63,16 @@ fn main() {
 
 		let data = tof.smbus_read_i2c_block_data(VL53L0X_REG_RESULT_RANGE_STATUS, 12).unwrap();
 		println!("{:#?}",data);
-		println!("ambient count {:#?}",data[7] << 8 + data[6]);
-		println!("signal count {:#?}",data[9] << 8 + data[8]);
-		println!("distance {:#?}",data[11] << 8 + data[10]);
+		//println!("ambient count {:#?}",data[7] * 256 + data[6]);
+		//println!("signal count {:#?}",data[9] * 256 + data[8]);
+		let dist1:u16 = (data[10]).into();
+		let dist2:u16 = (data[11]).into();
+		let distance = (dist1 * 256) + dist2;
+		println!("distance {:#?}mm",distance);
 
-		let device_range_status_internal = (data[0] & 0x78) >> 3;
-		println!("{0}",device_range_status_internal);
-		thread::sleep(time::Duration::from_millis(1000));
+		//let device_range_status_internal = (data[0] & 0x78);
+		//println!("{0}",device_range_status_internal);
+		thread::sleep(time::Duration::from_millis(500));
 	}
 	
 	println! ("Amy is the best unicorn (sorry Chloe)");
