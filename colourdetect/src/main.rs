@@ -1,8 +1,13 @@
 extern crate opencv;
+extern crate time;
 
 use opencv::core;
 use opencv::highgui;
 use opencv::imgproc;
+//use opencv::highgui::VideoCapture;
+
+
+use std::time::Instant;
 
 //int lowH[4] = { 0, 51, 75, 20 };
 //int highH[4] = { 10, 75, 107, 35 };
@@ -16,7 +21,10 @@ use opencv::imgproc;
 
 
 
-fn get_colour() -> Result<i32,String> {
+fn get_colour(mut frame: core::Mat) -> Result<i32,String> {
+	
+	let now = Instant::now();
+	println!("Start {:#?}",Instant::now().duration_since(now));
 	
 	let mut ret = -1;	
 	
@@ -48,22 +56,29 @@ fn get_colour() -> Result<i32,String> {
 	let window2 = "Overlay";
 	try!(highgui::named_window(window2,1));
 	    
-    let mut cam = try!(highgui::VideoCapture::device(0));
+	println!("Now {:#?}",Instant::now().duration_since(now));
+    //let mut cam = try!(highgui::VideoCapture::device(0));
     
-	let mut frame = try!(core::Mat::new());
-	try!(cam.read(&mut frame));
+	//let mut frame = try!(core::Mat::new());
+	//try!(cam.read(&mut frame));
+	
 	if try!(frame.size()).width == 0 {
 		println!("Failed to create camera frame");
 		let ret =-999;
 		return Ok(ret);
 	}
 	
-	let mut frame2 = try!(core::Mat::clone( &frame ) );
+	println!("Now {:#?}",Instant::now().duration_since(now));
+	
+	//let mut frame2 = try!(core::Mat::clone( &frame ) );
+	let mut frame2 = try!(core::Mat::rect( &frame, core::Rect{x:0,y:200,width:640,height:80}) );
 					
 	let mut img_hsv = try!(core::Mat::new());
 	try!(imgproc::cvt_color(&mut frame, &mut img_hsv, imgproc::COLOR_BGR2HSV, 0));
 	
-	let mut img_thresholded = try!(core::Mat::new());				
+	let mut img_thresholded = try!(core::Mat::new());
+	
+	println!("Now {:#?}",Instant::now().duration_since(now));				
 	
 	for colour in colours.iter()
 	{
@@ -114,7 +129,7 @@ fn get_colour() -> Result<i32,String> {
 		
 		let moments = result.unwrap();		
 		let area = 	moments.m00;
-		println!("Area {:#?}",area);
+		//println!("Area {:#?}",area);
 		if area > 5000f64
 		{
 			if *colour == red || *colour == red2 {
@@ -133,18 +148,24 @@ fn get_colour() -> Result<i32,String> {
 				try!(core::rectangle(&mut frame2,core::Rect{x:0,y:0,width:30,height:30},core::Scalar{ data:[0f64,255f64,255f64,-1f64] },-1 ,8 ,0));				
 				ret = yellow;
 			}
-			try!(highgui::imshow(window2, &mut img_final));			
+			//try!(highgui::imshow(window2, &mut img_final));			
 		}		
     }
-    try!(highgui::imshow(window, &mut frame2));
-	try!(highgui::wait_key(5));
+    //try!(highgui::imshow(window, &mut frame2));
+	//try!(highgui::wait_key(5));
+	
+	println!("Now {:#?}",Instant::now().duration_since(now));
 	
     Ok(ret)
 }
 
 fn main() {
-	loop {		
-		let colour = get_colour().unwrap();
+
+	let mut cam = highgui::VideoCapture::device(0).unwrap();
+	loop {
+		let mut frame = core::Mat::new().unwrap();
+		cam.read(&mut frame);
+		let colour = get_colour(frame).unwrap();
 		if colour == -999 {
 			break;
 		}
