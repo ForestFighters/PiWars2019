@@ -82,7 +82,7 @@ fn main() {
 
 	const ADDRESS: u16										= 0x29;
 	
-	let device = "/dev/i2c-1";
+	let device = "/dev/i2c-5";
 	let mut tof = VL53L0X::new( device, ADDRESS).unwrap();
 	
 	loop {

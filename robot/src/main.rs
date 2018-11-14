@@ -13,7 +13,38 @@ use i2cdev::linux::*;
 use i2cdev::core::*;
 
 use gilrs::{Gilrs, Button, Event };
-use gilrs::Axis::{LeftZ, RightZ, LeftStickX, LeftStickY};
+use gilrs::Axis::{LeftZ, RightZ, LeftStickX, LeftStickY, DPadY};
+
+struct Servo {
+	pwm_pin: u32
+}
+
+impl Servo {	
+	
+	fn init( &self ){				
+		set_mode(self.pwm_pin, OUTPUT).unwrap();		
+		servo(self.pwm_pin, 0);
+		//set_pwm_frequency(self.pwm_pin, 500).unwrap();
+		//set_pwm_range(self.pwm_pin, 1000).unwrap();
+	}
+	
+	fn set_pulse_width( &self, mut width: u32 ) {
+		if width < 500  {
+			width = 500;
+		}
+		if width > 2500 {
+			width = 2500;
+		}
+		servo(self.pwm_pin, width);
+	}	
+		
+}
+
+fn build_servo( pwm_pin: u32 ) -> Servo {
+	Servo {
+		pwm_pin		
+	}
+}
 
 struct Motor {			
 	pwm_pin: u32,
@@ -87,6 +118,8 @@ fn main() {
 	
 	let right_front_motor = build_motor( 12, 8);  //( 32, 24);	
 	right_front_motor.init();
+	
+	let servo = build_servo( 9 );
 	    
     let mut gilrs = Gilrs::new().unwrap();
     
@@ -108,6 +141,8 @@ fn main() {
 		let mut left_stick_y = 0;
 		let mut right_stick_y = 0;
 		let mut right_stick_x = 0;
+		
+		let mut dpad = 0;
 				
 		if gilrs[0].axis_data(LeftStickY).is_some() {				
 			left_stick_y = (gilrs[0].axis_data(LeftStickY).unwrap().value() * 1000.0) as i32;
@@ -123,7 +158,11 @@ fn main() {
 		
 		if gilrs[0].axis_data(LeftZ).is_some() {				
 			right_stick_x = (gilrs[0].axis_data(LeftZ).unwrap().value() * 1000.0) as i32;	
-		}		
+		}	
+		
+		if gilrs[0].axis_data(DPadY).is_some() {				
+			dpad = (gilrs[0].axis_data(DPadY).unwrap().value()) as i32;
+		}	
 		
 		if gilrs[0].is_pressed(Button::LeftTrigger2) {
 			lock = true;
@@ -197,6 +236,13 @@ fn main() {
 				right_rear_speed  = -left_stick_x - left_stick_y + right_stick_x;
 				right_front_speed = left_stick_x - left_stick_y + right_stick_x;
 			}
+		}
+		
+		if dpad == 1 {
+			servo.set_pulse_width( 2500 );
+		}
+		else if dpad == -1 {
+			servo.set_pulse_width( 500 );
 		}
 		
 		left_front_speed  = left_front_speed / gear;
