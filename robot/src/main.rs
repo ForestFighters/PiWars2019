@@ -81,7 +81,7 @@ impl Motor {
 	fn forward( &self, power: u32 ) {		
 		write(self.dir_pin, ON).unwrap();	
 		pwm(self.pwm_pin, power).unwrap();			
-	}
+	}mecanum
 	
 	fn backward( &self, power: u32 ) {		
 		write(self.dir_pin, OFF).unwrap();	
