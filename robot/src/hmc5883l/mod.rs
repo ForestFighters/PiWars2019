@@ -7,15 +7,15 @@ use self::i2cdev::core::I2CDevice;
 use std::f32::consts::PI;
 use std::{thread, time};
 
-const ADDRESS: u16	= 0x1E;
+const ADDRESS: u16  = 0x1E;
 
 pub struct HMC5883L {
     compass: Box<LinuxI2CDevice>
 }
 
 impl HMC5883L {
-	
-	pub fn new(filename: &'static str) -> Result<Self, Box<LinuxI2CError>> {
+    
+    pub fn new(filename: &'static str) -> Result<Self, Box<LinuxI2CError>> {
 
         let mut compass = try!(LinuxI2CDevice::new(filename, ADDRESS));
 
@@ -52,12 +52,12 @@ impl HMC5883L {
     
     
     pub fn read_radians(&mut self) -> Result<(f32), Box<LinuxI2CError>> {
-		
-		let gauss_lsb_xy = 1100.0;
-		let gauss_lsb_z  =  980.0;    
-		let declination_angle = 0.00116355; // Suffolk in radians, not degrees
-		
-		// read raw values
+        
+        let gauss_lsb_xy = 1100.0;
+        let gauss_lsb_z  =  980.0;    
+        let declination_angle = 0.00116355; // Suffolk in radians, not degrees
+        
+        // read raw values
         let (x, y, z) = self.read().unwrap();
 
         // convert to micro-teslas
@@ -75,15 +75,15 @@ impl HMC5883L {
         
         Ok(heading as f32)
         
-	}
-	
+    }
+    
     
     pub fn read_degrees(&mut self) -> Result<(f32), Box<LinuxI2CError>> {
-		
-		let radians = self.read_radians().unwrap();
-		
-		let heading = radians * 180.0 / PI;
-		 
+        
+        let radians = self.read_radians().unwrap();
+        
+        let heading = radians * 180.0 / PI;
+         
         Ok(heading as f32)
     }
 }
