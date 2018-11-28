@@ -136,6 +136,87 @@ impl VL53L0X {
     }
 }
 // ---------------------------------- 8< ---------------------------------------------------------
+use std::f32::consts::PI;
+
+pub struct HMC5883L {
+    compass: Box<LinuxI2CDevice>
+}
+
+impl HMC5883L {
+	
+	pub fn new(filename: &'static str, address: u16) -> Result<Self, Box<LinuxI2CError>> {
+
+        let mut compass = try!(LinuxI2CDevice::new(filename, address));
+
+        // set gain to +/1 1.3 Gauss
+        try!(compass.smbus_write_byte_data(0x01, 0x20));
+
+        // set in continuous-measurement mode
+        try!(compass.smbus_write_byte_data(0x02, 0x00));
+
+        // delay before taking first reading
+        thread::sleep(time::Duration::from_millis(100));
+
+        Ok(HMC5883L { compass: Box::new(compass) })
+    }
+    
+    pub fn read(&mut self) -> Result<(f32, f32, f32), Box<LinuxI2CError>> {
+
+        // read two bytes each from registers 03 through 05 (x, z, y)
+        let mut buf: [u8; 6] = [0; 6];
+        try!(self.compass.read(&mut buf));
+
+        // start reading from register 03 (x value)
+        try!(self.compass.smbus_write_byte(0x03));
+        thread::sleep(time::Duration::from_millis(100));
+
+        // parse the data in the correct order - x, z, y (NOT x, y, z as you would expect)
+        let x : i16 = ((buf[0] as i16) << 8) as i16 | buf[1] as i16;
+        let z : i16 = ((buf[2] as i16) << 8) as i16 | buf[3] as i16;
+        let y : i16 = ((buf[4] as i16) << 8) as i16 | buf[5] as i16;
+
+        // return tuple containing x, y, z values
+        Ok((x as f32, y as f32, z as f32))
+    }
+    
+    
+    pub fn read_radians(&mut self) -> Result<(f32), Box<LinuxI2CError>> {
+		
+		let gauss_lsb_xy = 1100.0;
+		let gauss_lsb_z  =  980.0;    
+		let declination_angle = 0.00116355; // Suffolk in radians, not degrees
+		
+		// read raw values
+        let (x, y, z) = self.read().unwrap();
+
+        // convert to micro-teslas
+        let (x, y, _z) = (x/gauss_lsb_xy*100.0, y/gauss_lsb_xy*100.0, z/gauss_lsb_z*100.0);
+
+        let mut heading = y.atan2(x) + declination_angle;
+
+        if heading < 0.0 {
+            heading += 2.0 * PI;
+        }
+
+        if heading > 2.0 * PI {
+            heading -= 2.0 * PI;
+        }
+        
+        Ok(heading as f32)
+        
+	}
+	
+    
+    pub fn read_degrees(&mut self) -> Result<(f32), Box<LinuxI2CError>> {
+		
+		let radians = self.read_radians().unwrap();
+		
+		let heading = radians * 180.0 / PI;
+		 
+        Ok(heading as f32)
+    }
+}
+// ---------------------------------- 8< ---------------------------------------------------------
 
 //mod VL53L0X;
 
@@ -161,7 +242,7 @@ fn main() {
 	println!("Initialized pigpio. Version: {}", initialize().unwrap());
     let interval = time::Duration::from_millis(2000);
 
-    //Use BCM numbering
+    //Use BCM nuse std::f32::consts::PI;umbering
     let left_rear_motor = build_motor( 17, 27);
 	left_rear_motor.init();
 		
@@ -182,9 +263,15 @@ fn main() {
 	let mut left = VL53L0X::new( "/dev/i2c-7", ADDRESS).unwrap();
 	let mut back = VL53L0X::new( "/dev/i2c-8", ADDRESS).unwrap();
 	
+	
+	const ADDRESS2: u16	= 0x1E;	
+	let mut compass = HMC5883L::new( "/dev/i2c-9", ADDRESS2).unwrap();
+	
 	let mut distance: u16 = 0;
 	let mut direction = "Front";
 	let mut state = 1;	
+	
+	let original = compass.read_degrees().unwrap();
 	
 	let mut left_rear_speed: i32;
 	let mut right_rear_speed: i32;
@@ -194,61 +281,26 @@ fn main() {
 	println!("{}c", 27 as char);
 	println!("{}[s", 27 as char);
 	loop {
-		//thread::sleep(time::Duration::from_millis(100));
+		
+		let heading = compass.read_degrees().unwrap();
+		
+		let mut diff = ((heading - original) * 8.0) as i32;		
+		
 		let front_dist = front.read().unwrap();
 		let right_dist = right.read().unwrap();
 		let left_dist = left.read().unwrap();
-		let back_dist = back.read().unwrap();
+		let back_dist = back.read().unwrap();				
 		
-		println!("{}[u", 27 as char);
-		println!("Direction {:#?}, Distance {:#?}mm      ",direction, distance);	
-		
-		if direction == "Front" {
-			left_rear_speed =    SPEED;
-			right_rear_speed =   SPEED * -1;
-			left_front_speed =   SPEED;
-			right_front_speed =  SPEED * -1;
-		}
-		else if direction == "Back" {
-			left_rear_speed =    SPEED  * -1;
-			right_rear_speed =   SPEED;
-			left_front_speed =   SPEED  * -1;
-			right_front_speed =  SPEED;
-		}
-		else if direction == "Left" {
-			left_rear_speed =   SPEED * -1;
-			right_rear_speed =  SPEED;
-			left_front_speed =  SPEED;
-			right_front_speed = SPEED * -1;
-		}
-		else if direction == "Right" {
-			left_rear_speed =   SPEED;
-			right_rear_speed =  SPEED * -1;
-			left_front_speed =  SPEED * -1;
-			right_front_speed = SPEED;
-		}
-		else {
-			left_rear_speed =  0;
-			right_rear_speed = 0;
-			left_front_speed = 0;
-			right_front_speed = 0;			
+		if state == 1 {			
+			diff = (150 - (right_dist) as i32);
+			distance = right_dist;
+			if front_dist < 150 {
+				state = 10;
+				direction = "Left";
+				distance = front_dist;
+			}
 		}
 		
-		left_rear_motor.power(left_rear_speed);
-		right_rear_motor.power(right_rear_speed);	
-		left_front_motor.power(left_front_speed);
-		right_front_motor.power(right_front_speed);	
-		//println!("front {:#?}mm      ",front_dist);		
-		//println!("right {:#?}mm      ",right_dist);	
-		//println!("left {:#?}mm       ",left_dist);	
-		//println!("back {:#?}mm       ",back_dist);	
-		
-		if state == 1 && front_dist < 150  {
-			// && right_dist < 150
-			state = 2;
-			direction = "Left";
-			distance = front_dist;
-		}
 		if state == 2 && left_dist < 150  {
 			// && front_dist < 150
 			state = 3;
@@ -291,73 +343,66 @@ fn main() {
 			direction = "Back";
 			distance = right_dist;
 		}
-		if state == 9 && front_dist > 2000 {
+		if state == 9 && right_dist > 150 && front_dist > 2000 {
 			state = 10;
 			direction = "Finished";	
 			distance = front_dist;
 		}
 		if state == 10 {			
 			break;
+		}	
+		
+		println!("{}[u", 27 as char);
+		println!("Direction {:#?}, Distance {:#?}mm  Heading {:#?}°  Diff {:#?}     ",direction, distance, heading, diff);
+		
+		if direction == "Front" {			
+			left_rear_speed =    (SPEED - diff);
+			right_rear_speed =   SPEED * -1;
+			left_front_speed =   (SPEED - diff);
+			right_front_speed =  SPEED * -1;
 		}
+		else if direction == "Back" {
+			left_rear_speed =    (SPEED + diff)  * -1;
+			right_rear_speed =   SPEED;
+			left_front_speed =   (SPEED + diff)  * -1;
+			right_front_speed =  SPEED;
+		}
+		else if direction == "Left" {
+			left_rear_speed =   SPEED * -1;
+			right_rear_speed =  SPEED;
+			left_front_speed =  SPEED;
+			right_front_speed = SPEED * -1;
+		}
+		else if direction == "Right" {
+			left_rear_speed =   SPEED;
+			right_rear_speed =  SPEED * -1;
+			left_front_speed =  SPEED * -1;
+			right_front_speed = SPEED;
+		}
+		else {
+			left_rear_speed =  0;
+			right_rear_speed = 0;
+			left_front_speed = 0;
+			right_front_speed = 0;			
+		}
+		
+		left_rear_motor.power(left_rear_speed);
+		right_rear_motor.power(right_rear_speed);	
+		left_front_motor.power(left_front_speed);
+		right_front_motor.power(right_front_speed);	
+		//println!("front {:#?}mm      ",front_dist);		
+		//println!("right {:#?}mm      ",right_dist);	
+		//println!("left {:#?}mm       ",left_dist);	
+		//println!("back {:#?}mm       ",back_dist);	
+		
+		
 	}
+	
+	left_rear_motor.stop();
+	right_rear_motor.stop();	
+	left_front_motor.stop();
+	right_front_motor.stop();	
+	
 }
 
-//fn main() {
-	//let interval = time::Duration::from_millis(10);
-    //println!("Hello, Amy! How are you, today?");
-    
-    //let bus = "/dev/i2c-1";
-    //let mut tof = LinuxI2CDevice::new(bus,ADDRESS).unwrap();
-    
-    //let phalanges = tof.smbus_read_byte_data(VL53L0X_REG_IDENTIFICATION_REVISION_ID).unwrap();
-   
-    
-    //let pickle = tof.smbus_read_byte_data(VL53L0X_REG_IDENTIFICATION_MODEL_ID).unwrap();
-	//println! ("The happiest device ID: {0} {1}", phalanges, pickle);
-	
-	
-	//let prerange = tof.smbus_read_byte_data(VL53L0X_REG_PRE_RANGE_CONFIG_VCSEL_PERIOD).unwrap();
-	//println! ("PRE_RANGE_CONFIG_VCSEL_PERIOD = {0}",prerange);
 
-
-	//let range = tof.smbus_read_byte_data(VL53L0X_REG_FINAL_RANGE_CONFIG_VCSEL_PERIOD).unwrap();
-	//println!("FINAL_RANGE_CONFIG_VCSEL_PERIOD = {0}",range);
-
-	//loop {
-		//let mut cnt = 0;
-		//let _start = tof.smbus_write_byte_data(VL53L0X_REG_SYSRANGE_START, 0x01);
-		//let mut status = tof.smbus_read_byte_data(VL53L0X_REG_RESULT_RANGE_STATUS).unwrap();
-		//loop {
-			//if (status & 0x01) == 0x01 || cnt >= 100  {
-				//break;
-			//}
-			//// 1 second waiting time max
-			//thread::sleep(interval);    
-			//status = tof.smbus_read_byte_data(VL53L0X_REG_RESULT_RANGE_STATUS).unwrap();
-			//cnt += 1;
-		//}
-
-		//if (status & 0x01) == 0x01 {
-			//println!("ready");
-		//}
-		//else {
-			//println!( "not ready");
-		//}
-
-		//let data = tof.smbus_read_i2c_block_data(VL53L0X_REG_RESULT_RANGE_STATUS, 12).unwrap();
-		//println!("{:#?}",data);
-		////println!("ambient count {:#?}",data[7] * 256 + data[6]);
-		////println!("signal count {:#?}",data[9] * 256 + data[8]);
-		//let dist1:u16 = (data[10]).into();
-		//let dist2:u16 = (data[11]).into();
-		//let distance = (dist1 * 256) + dist2;
-		//println!("distance {:#?}mm",distance);
-
-		////let device_range_status_internal = (data[0] & 0x78);
-		////println!("{0}",device_range_status_internal);
-		//thread::sleep(time::Duration::from_millis(500));
-	//}
-	
-	//println! ("Amy is the best unicorn (sorry Chloe)");
-
-//}

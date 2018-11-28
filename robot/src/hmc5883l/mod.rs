@@ -1,16 +1,12 @@
-//extern crate hmc5883l;
-//use hmc5883l::*;
-
+// ---------------------------------- 8< ---------------------------------------------------------
 extern crate i2cdev;
+extern crate byteorder;
 
-use i2cdev::linux::*;
-use i2cdev::core::I2CDevice;
-
-use std::thread;
-use std::time::Duration;
+use self::i2cdev::linux::*;
+use self::i2cdev::core::I2CDevice;
 use std::f32::consts::PI;
+use std::{thread, time};
 
-/// based on https://github.com/adafruit/Adafruit_HMC5883_Unified/blob/master/examples/magsensor/magsensor.ino
 
 pub struct HMC5883L {
     compass: Box<LinuxI2CDevice>
@@ -29,7 +25,7 @@ impl HMC5883L {
         try!(compass.smbus_write_byte_data(0x02, 0x00));
 
         // delay before taking first reading
-        thread::sleep(Duration::from_millis(100));
+        thread::sleep(time::Duration::from_millis(100));
 
         Ok(HMC5883L { compass: Box::new(compass) })
     }
@@ -42,7 +38,7 @@ impl HMC5883L {
 
         // start reading from register 03 (x value)
         try!(self.compass.smbus_write_byte(0x03));
-        thread::sleep(Duration::from_millis(100));
+        thread::sleep(time::Duration::from_millis(100));
 
         // parse the data in the correct order - x, z, y (NOT x, y, z as you would expect)
         let x : i16 = ((buf[0] as i16) << 8) as i16 | buf[1] as i16;
@@ -90,18 +86,4 @@ impl HMC5883L {
         Ok(heading as f32)
     }
 }
-
-
-fn main() {
-	
-	const ADDRESS: u16	= 0x1E;
-	
-	let mut compass = HMC5883L::new( "/dev/i2c-9", ADDRESS).unwrap();
-	
-	loop {
-		let heading = compass.read_degrees().unwrap();
-		println!("heading={:.*}", 1, heading);
-        thread::sleep(Duration::from_millis(500));
-	}
-	    
-}
+// ---------------------------------- 8< ---------------------------------------------------------

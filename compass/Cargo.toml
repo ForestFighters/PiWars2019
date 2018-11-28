@@ -4,4 +4,6 @@ version = "0.1.0"
 authors = ["ptbw <ptbwillis@gmail.com>"]
 
 [dependencies]
-hmc5883l = "1.0.2"
+rust-pigpio = "0.2.0"
+i2cdev = "0.4.0"
+byteorder = "1.2.6"

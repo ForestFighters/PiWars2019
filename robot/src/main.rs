@@ -3,104 +3,16 @@ extern crate i2cdev;
 extern crate byteorder;
 extern crate gilrs;
 
-use std::{thread, time};
-use std::time::Duration;
-use std::cmp::{min, max};
-use rust_pigpio::*;
-use rust_pigpio::pwm::*;
+extern crate robot;
 
-use i2cdev::linux::*;
-use i2cdev::core::*;
+use std::{thread, time};
+use rust_pigpio::*;
 
 use gilrs::{Gilrs, Button, Event };
 use gilrs::Axis::{LeftZ, RightZ, LeftStickX, LeftStickY, DPadY};
 
-struct Servo {
-	pwm_pin: u32
-}
-
-impl Servo {	
-	
-	fn init( &self ){				
-		set_mode(self.pwm_pin, OUTPUT).unwrap();		
-		servo(self.pwm_pin, 0);
-		//set_pwm_frequency(self.pwm_pin, 500).unwrap();
-		//set_pwm_range(self.pwm_pin, 1000).unwrap();
-	}
-	
-	fn set_pulse_width( &self, mut width: u32 ) {
-		if width < 500  {
-			width = 500;
-		}
-		if width > 2500 {
-			width = 2500;
-		}
-		servo(self.pwm_pin, width);
-	}	
-		
-}
-
-fn build_servo( pwm_pin: u32 ) -> Servo {
-	Servo {
-		pwm_pin		
-	}
-}
-
-struct Motor {			
-	pwm_pin: u32,
-	dir_pin: u32,	
-}
-
-impl Motor {	
-	
-	fn init( &self ){				
-		set_mode(self.dir_pin, OUTPUT).unwrap();
-		set_mode(self.pwm_pin, OUTPUT).unwrap();
-		write(self.dir_pin, ON).unwrap();
-		set_pwm_frequency(self.pwm_pin, 500).unwrap(); 	// Set to modulate at 500hz.
-		set_pwm_range(self.pwm_pin, 1000).unwrap(); 		// Set range to 1000. 1 range = 2 us;
-	}
-	
-	fn power( &self, power: i32 ) {
-		
-		// limit range
-		let actual = min(1000, power.abs());
-		
-		if power >= 0 {			
-			let pwm = actual as u32;
-			//println!("Forward Power {0} ", pwm);
-			self.forward( pwm );
-		}
-		else {
-			let pwm = actual as u32;
-			//println!("Backward Power {0} ", pwm);
-			self.backward( pwm );
-		}
-	}
-
-	fn forward( &self, power: u32 ) {		
-		write(self.dir_pin, ON).unwrap();	
-		pwm(self.pwm_pin, power).unwrap();			
-	}mecanum
-	
-	fn backward( &self, power: u32 ) {		
-		write(self.dir_pin, OFF).unwrap();	
-		pwm(self.pwm_pin, power).unwrap();					
-	}
-	
-	fn stop( &self ){				
-		write(self.dir_pin, ON).unwrap();	
-		pwm(self.pwm_pin, 0).unwrap();							
-	}
-
-}
-
-fn build_motor( pwm_pin: u32, dir_pin: u32 ) -> Motor {
-	Motor {
-		pwm_pin,
-		dir_pin
-	}
-}
+use robot::servo::*;
+use robot::motor::*;
 
 fn main() {
     println!("Initialized pigpio. Version: {}", initialize().unwrap());
