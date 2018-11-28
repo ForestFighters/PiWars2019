@@ -13,8 +13,36 @@ use gilrs::Axis::{LeftZ, RightZ, LeftStickX, LeftStickY, DPadY};
 
 use robot::servo::*;
 use robot::motor::*;
+use robot::ssd1327::*;
+//use robot::hmc5883l::*;   Not connected atm 
+use robot::vl53l0x::*;
 
 fn main() {
+		
+	// Test OLED display
+	let mut display = SSD1327::new("/dev/i2c-9");
+	display.begin().unwrap();
+	display.clear();
+	display.draw_text(20, 42, "Forest", WHITE).unwrap();
+	display.draw_text(20, 50, "Fighters", WHITE).unwrap();
+	display.draw_text(20, 58, "Ready...", WHITE).unwrap();
+	display.update_all().unwrap();	
+	
+	// Test compass Not connected atm 
+	//let mut compass = HMC5883L::new("/dev/i2c-9").unwrap();
+	//println!("Current Heading {:.*}", 1, compass.read_degrees().unwrap());
+	
+	// Test distance sensors
+	let mut front = VL53L0X::new( "/dev/i2c-5").unwrap();
+	let mut right = VL53L0X::new( "/dev/i2c-6").unwrap();
+	let mut left = VL53L0X::new( "/dev/i2c-7").unwrap();
+	let mut back = VL53L0X::new( "/dev/i2c-8").unwrap(); 
+	
+	println!("Front Distance {:.*}", 1, front.read().unwrap());
+	println!("Right Distance {:.*}", 1, right.read().unwrap());
+	println!("Left Distance {:.*}", 1, left.read().unwrap());
+	println!("Back Distance {:.*}", 1, back.read().unwrap());
+	
     println!("Initialized pigpio. Version: {}", initialize().unwrap());
     let interval = time::Duration::from_millis(2000);
 

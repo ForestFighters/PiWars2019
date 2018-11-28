@@ -13,7 +13,7 @@ impl Servo {
 	
 	pub fn init( &self ){				
 		set_mode(self.pwm_pin, OUTPUT).unwrap();		
-		servo(self.pwm_pin, 0);
+		servo(self.pwm_pin, 0).unwrap();
 		//set_pwm_frequency(self.pwm_pin, 500).unwrap();
 		//set_pwm_range(self.pwm_pin, 1000).unwrap();
 	}
@@ -25,7 +25,7 @@ impl Servo {
 		if width > 2500 {
 			width = 2500;
 		}
-		servo(self.pwm_pin, width);
+		servo(self.pwm_pin, width).unwrap();
 	}	
 		
 }

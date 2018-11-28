@@ -2,7 +2,7 @@ extern crate i2cdev;
 extern crate font8x8;
 
 use self::i2cdev::core::*;
-use self::i2cdev::linux::{LinuxI2CDevice, LinuxI2CError};
+use self::i2cdev::linux::LinuxI2CDevice;
 use self::font8x8::legacy::BASIC_LEGACY;
 
 pub trait Display {
@@ -34,7 +34,7 @@ pub const DK_GREY: u16 = 0x0C;
 pub const LCD_WIDTH: u16 = 128;
 pub const LCD_HEIGHT: u16 = 128;
 
-const ADDR: u16 = 0x3D;
+const ADDRESS: u16 = 0x3D;
 const COMMAND_MODE: u8 = 0x00; /* C0 and DC bit are 0 				 */
 const DATA_MODE: u8 = 0x40; /* C0 bit is 0 and DC bit is 1 */
 
@@ -68,7 +68,7 @@ pub struct SSD1327 {
 
 impl SSD1327 {
 	
-	pub fn new() -> SSD1327 {
+	pub fn new(filename: &'static str) -> SSD1327 {
 		let w = LCD_WIDTH;
 		let h = LCD_HEIGHT;
 		SSD1327 {
@@ -76,7 +76,7 @@ impl SSD1327 {
 			lcd_height: LCD_HEIGHT,            
 			poled_buf: vec![0; (w/2 * h) as usize],
 			old_poled_buf: vec![0; (w/2 * h) as usize],
-			i2c: LinuxI2CDevice::new("/dev/i2c-9", ADDR).unwrap_or_else(|_| {
+			i2c: LinuxI2CDevice::new(filename, ADDRESS).unwrap_or_else(|_| {
 				panic!("Cannot create i2c device for the display");
 			}),
 		}
@@ -293,7 +293,7 @@ impl Display for SSD1327 {
 		Ok(())
 	}
 	
-	fn draw_char(&mut self, x1: i16, y1: i16, chr: char, colour: u16) -> Result<(), String> {
+	fn draw_char(&mut self, x1: i16, y1: i16, chr: char, _colour: u16) -> Result<(), String> {
 		
 		if x1 > (self.lcd_width as i16) - 1 || y1 > (self.lcd_height as i16) - 1 || x1 < 0 || y1 < 0 {
 			println!("char coords exceed the normal display range");
@@ -343,7 +343,7 @@ impl Display for SSD1327 {
 				x_point = x1;
 				y_point = y1;
 			}
-			self.draw_char(x_point, y_point, chr, colour);        
+			self.draw_char(x_point, y_point, chr, colour).unwrap();        
 			x_point = x_point + 8;			
 		}	
 		return Ok(());   
@@ -377,13 +377,13 @@ impl Display for SSD1327 {
 			return Ok(());
 		}
 
-		self.draw_colour( x1, y1, colour);
+		self.draw_colour( x1, y1, colour).unwrap();
 		
 		return Ok(());   
 	}
 
 	
-	fn draw_line(&mut self, x1: i16, y1: i16, x2: i16, y2: i16, colour: u16, width: u16) -> Result<(), String> {
+	fn draw_line(&mut self, x1: i16, y1: i16, x2: i16, y2: i16, colour: u16, _width: u16) -> Result<(), String> {
 		if x1 > (self.lcd_width as i16) - 1 || y1 > (self.lcd_height as i16) - 1 || x1 < 0 || y1 < 0 {
 			println!("start coords exceed the normal display range");
 			return Ok(());
@@ -419,7 +419,7 @@ impl Display for SSD1327 {
 		let mut esp = dx + dy;
 		
 		loop {
-			self.draw_pixel( x_point, y_point, colour);			
+			self.draw_pixel( x_point, y_point, colour).unwrap();			
 			if 2 * esp >= dy {
 				if x_point == x_end {
 					break;
@@ -465,17 +465,17 @@ impl Display for SSD1327 {
 			y_end = y1;
 		}
 
-		let mut x_point = x_start;
-		let mut y_point = y_start;
+		let _x_point = x_start;
+		let y_point = y_start;
 		if filled {
 			 for y_point in y_point..y_end {					
-				self.draw_line(x_start, y_point, x_end, y_point, colour, 1);
+				self.draw_line(x_start, y_point, x_end, y_point, colour, 1).unwrap();
 			}
 		} else {
-			self.draw_line(x_start, y_start, x_end, y_start, colour, 1);
-			self.draw_line(x_end, y_start, x_end, y_end, colour, 1);			
-			self.draw_line(x_end, y_end, x_start, y_end, colour, 1);			
-			self.draw_line(x_start, y_end, x_start, y_start, colour, 1);			
+			self.draw_line(x_start, y_start, x_end, y_start, colour, 1).unwrap();
+			self.draw_line(x_end, y_start, x_end, y_end, colour, 1).unwrap();			
+			self.draw_line(x_end, y_end, x_start, y_end, colour, 1).unwrap();			
+			self.draw_line(x_start, y_end, x_start, y_start, colour, 1).unwrap();			
 		}
 		Ok(())
 	}

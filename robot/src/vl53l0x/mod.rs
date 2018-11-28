@@ -15,15 +15,17 @@ const VL53L0X_REG_SYSRANGE_START: u8					= 0x00;
 //const VL53L0X_REG_RESULT_INTERRUPT_STATUS: u8			= 0x13;
 const VL53L0X_REG_RESULT_RANGE_STATUS: 	u8				= 0x14;
 
+const ADDRESS: u16										= 0x29;
+
 pub struct VL53L0X {
     tof: Box<LinuxI2CDevice>
 }
 
 impl VL53L0X {
 
-    pub fn new(filename: &'static str, address: u16) -> Result<Self, Box<LinuxI2CError>> {
+    pub fn new(filename: &'static str) -> Result<Self, Box<LinuxI2CError>> {
 
-        let mut tof = try!(LinuxI2CDevice::new(filename, address));
+        let mut tof = try!(LinuxI2CDevice::new(filename, ADDRESS));
         // delay before taking first reading
         thread::sleep(time::Duration::from_millis(100));
         

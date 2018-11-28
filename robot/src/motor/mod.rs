@@ -5,7 +5,7 @@ extern crate byteorder;
 use self::rust_pigpio::*;
 use self::rust_pigpio::pwm::*;
 
-use std::cmp::{min, max};
+use std::cmp::min;
 
 pub struct Motor {			
 	pub pwm_pin: u32,

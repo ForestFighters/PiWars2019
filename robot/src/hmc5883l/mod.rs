@@ -7,6 +7,7 @@ use self::i2cdev::core::I2CDevice;
 use std::f32::consts::PI;
 use std::{thread, time};
 
+const ADDRESS: u16	= 0x1E;
 
 pub struct HMC5883L {
     compass: Box<LinuxI2CDevice>
@@ -14,9 +15,9 @@ pub struct HMC5883L {
 
 impl HMC5883L {
 	
-	pub fn new(filename: &'static str, address: u16) -> Result<Self, Box<LinuxI2CError>> {
+	pub fn new(filename: &'static str) -> Result<Self, Box<LinuxI2CError>> {
 
-        let mut compass = try!(LinuxI2CDevice::new(filename, address));
+        let mut compass = try!(LinuxI2CDevice::new(filename, ADDRESS));
 
         // set gain to +/1 1.3 Gauss
         try!(compass.smbus_write_byte_data(0x01, 0x20));
