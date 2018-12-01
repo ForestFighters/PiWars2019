@@ -76,7 +76,7 @@ impl SSD1327 {
             lcd_height: LCD_HEIGHT,            
             poled_buf: vec![0; (w/2 * h) as usize],
             old_poled_buf: vec![0; (w/2 * h) as usize],
-            i2c: LinuxI2CDevice::new(filename, ADDRESS).unwrap_or_else(|_| {
+            i2c: LinuxI2CDevice::new( filename, ADDRESS).unwrap_or_else(|_| {
                 panic!("Cannot create i2c device for the display");
             }),
         }
@@ -211,10 +211,7 @@ impl SSD1327 {
         let mut last_column = 0;
         let mut first_column = 127;
         for i in 0..(self.lcd_width / 2 * self.lcd_height) {            
-            if self.poled_buf[i as usize] != self.old_poled_buf[i as usize] {
-                if first_change == 0 {
-                    first_change = i;               
-                }
+            if self.poled_buf[i as usize] != self.old_poled_buf[i as usize] {               
                 let current_column = (i % 64) * (2 as u16);
                 if current_column < first_column {
                     first_column = current_column;
@@ -225,19 +222,21 @@ impl SSD1327 {
                 last_change = i + 1;
             }
         }
-                
-        //println!(" First Change={}, Last Change={}",first_change, last_change);
         
         let start_column = first_column;
         let end_column = last_column;
         
         let start_row = ((first_change as f32) / 64.0).floor() as u8;               
         let end_row = ((last_change as f32) / 64.0).floor() as u8 + 1 as u8;
+        
+        //println!(" First Change={}, Last Change={}",first_change, last_change);       
+        first_change = (start_column / 2) + (start_row as u16 * 64);            
                          
         self.display_window( (start_column/2) as u8, start_row as u8, (end_column/2) as u8, end_row as u8);
         
-        //println!(" Start Col={}, End Col={}", start_column, end_column );
-        //println!(" Start Row={}, End Row={}", start_row, end_row);
+        //println!(" First Change={}, Last Change={}",first_change, last_change);
+        //println!(" Start {},{}", start_column, start_row );
+        //println!(" End   {},{}", end_column, end_row);
         
         
         //for row in start_row..(end_row+1) {
@@ -293,7 +292,7 @@ impl Display for SSD1327 {
         Ok(())
     }
     
-    fn draw_char(&mut self, x1: i16, y1: i16, chr: char, _colour: u16) -> Result<(), String> {
+    fn draw_char(&mut self, x1: i16, y1: i16, chr: char, colour: u16) -> Result<(), String> {
         
         if x1 > (self.lcd_width as i16) - 1 || y1 > (self.lcd_height as i16) - 1 || x1 < 0 || y1 < 0 {
             println!("char coords exceed the normal display range");
@@ -312,7 +311,7 @@ impl Display for SSD1327 {
                 //}
                 match *x & 1 << bit {
                     0 => self.draw_colour( x_point, y_point , BLACK).unwrap(),
-                    _ => self.draw_colour( x_point, y_point , WHITE).unwrap(),
+                    _ => self.draw_colour( x_point, y_point , colour).unwrap(),
                 }
                 x_point = x_point + 1;
             }   
@@ -465,7 +464,7 @@ impl Display for SSD1327 {
             y_end = y1;
         }
 
-        let _x_point = x_start;
+        //let x_point = x_start;
         let y_point = y_start;
         if filled {
              for y_point in y_point..y_end {                    
