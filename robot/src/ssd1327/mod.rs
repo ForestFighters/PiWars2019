@@ -1,9 +1,11 @@
+extern crate image;
 extern crate i2cdev;
 extern crate font8x8;
 
 use self::i2cdev::core::*;
 use self::i2cdev::linux::LinuxI2CDevice;
 use self::font8x8::legacy::BASIC_LEGACY;
+use self::image::{DynamicImage,imageops};
 
 pub trait Display {
     fn initialize(&mut self) -> Result<(), String>;
@@ -14,6 +16,7 @@ pub trait Display {
     fn draw_pixel(&mut self, x: i16, y: i16, colour: u16) -> Result<(), String>;
     fn draw_line(&mut self, x1: i16, y1: i16, x2: i16, y2: i16, colour: u16, width: u16) -> Result<(), String>;
     fn draw_rectangle(&mut self, x1: i16, y1: i16, x2: i16, y2: i16, colour: u16, filled: bool) -> Result<(), String>;
+    fn draw_image(&mut self, x1: i16, y1: i16, img: DynamicImage)-> Result<(), String>;
     fn clear(&mut self) -> Result<(), String>;
     fn clear_colour(&mut self, colour: u8) -> Result<(), String>;
     fn deinitialize(&mut self) -> Result<(), String>;
@@ -348,11 +351,36 @@ impl Display for SSD1327 {
         return Ok(());   
     }
     
+    fn draw_image(&mut self, x1: i16, y1: i16, img: DynamicImage) -> Result<(), String> { 
+		
+		if x1 > (self.lcd_width as i16) - 1 || y1 > (self.lcd_height as i16) - 1 || x1 < 0 || y1 < 0 {
+            println!("image position exceeds the normal display range");
+            return Ok(());
+        }
+        
+		let x = x1;
+		let y = y1;
+		
+		let grey = imageops::grayscale(&img);
+		let (width, height) = grey.dimensions();
+		
+		for img_x  in 0..width {
+			for img_y in 0..height {
+				let pixel = grey.get_pixel( img_x, img_y );			
+				let shade = (pixel.data[0] / 16 ) as u16;				
+				//println!("{:#?} ",shade);
+				self.draw_colour( x + img_x as i16, y + img_y as i16, shade ).unwrap();
+				
+			}
+		}
+		return Ok(());
+	}
+    
     
     fn draw_colour(&mut self, x1: i16, y1: i16, colour: u16) -> Result<(), String> {
         
         if x1 > (self.lcd_width as i16) - 1 || y1 > (self.lcd_height as i16) - 1 || x1 < 0 || y1 < 0 {
-            println!("pixel coords exceed the normal display range");
+            println!("pixel colour coords exceed the normal display range");
             return Ok(());
         }
         
