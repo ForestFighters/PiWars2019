@@ -50,6 +50,7 @@ fn do_canyon( display: &mut SSD1327, gilrs: &mut Gilrs ) {
 
 fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     
+    
     while let Some(Event { id, event, time }) = gilrs.next_event() {
             println!("{:?} New event from {}: {:?}", time, id, event); 
             break;              
@@ -59,12 +60,64 @@ fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs ) {
 }
 
 fn do_straight( display: &mut SSD1327, gilrs: &mut Gilrs ) {
+       
+
+    let mut right = VL53L0X::new( "/dev/i2c-6").unwrap();
+    let mut left = VL53L0X::new( "/dev/i2c-7").unwrap();
     
-    while let Some(Event { id, event, time }) = gilrs.next_event() {
+    display.clear(); 
+	display.draw_text(4, 4, "Press start...", WHITE).unwrap();
+	display.update_all().unwrap();
+    
+    let mut target: i32 = 0;
+    
+    let mut running = false;
+	loop {
+		while let Some(Event { id, event, time }) = gilrs.next_event() {
             println!("{:?} New event from {}: {:?}", time, id, event); 
             break;              
-        }
+		}
+		
+		// Start button -> running
+		if gilrs[0].is_pressed(Button::Start) {
+			target = left.read().unwrap() as i32 - right.read().unwrap() as i32;
+			display.draw_text(4, 4, "              ", WHITE).unwrap();
+			display.update().unwrap();
+			println!("Target {:?}", target); 
+            running = true;
+        } 
+		
+		
+		// Triangle and cross to exit
+        if gilrs[0].is_pressed(Button::West) && gilrs[0].is_pressed(Button::South) {
+            break;
+        } 
         
+        
+        if running {	
+                
+			let right_dist: i32 = right.read().unwrap() as i32;
+			let left_dist: i32 = left.read().unwrap() as i32;
+		
+			println!("Right {:#?}mm, Left {:#?}mm ",right_dist, left_dist);
+			
+			let difference: i32 = target - (left_dist - right_dist);
+			
+			if difference > 10 {
+				// turn right
+				println!("Turn Right {:04}  ", difference);
+			} else if difference < -10 {
+				// turn left
+				println!("Turn Left  {:04}  ", -difference);
+			} else {
+				// straight
+				println!("Straight");
+			}
+			
+				
+		}
+	}
+	
     display.clear();   
 }
 
@@ -282,7 +335,9 @@ fn do_mecanum_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
         }
         
         if gilrs[0].is_pressed(Button::South) {
-            gear = 4;           
+            gear = 4;           display.clear(); 
+            display.draw_text(4, 4, "Canyon...", LT_GREY).unwrap();
+            display.update_all().unwrap();
             display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
             display.update().unwrap();  
             println!(" {0} ",gear);
@@ -403,7 +458,7 @@ fn show_menu( display: &mut SSD1327, menu: i8) {display.clear();
 
 fn main() {
           
-    let mut display = SSD1327::new("/dev/i2c-1");
+    let mut display = SSD1327::new("/dev/i2c-9");
     display.begin().unwrap(); 
     
     display.clear();
