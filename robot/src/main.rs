@@ -59,66 +59,134 @@ fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     display.clear();   
 }
 
+
 fn do_straight( display: &mut SSD1327, gilrs: &mut Gilrs ) {
        
+	println!("Initialized pigpio. Version: {}", initialize().unwrap());
+    let interval = time::Duration::from_millis(2000);
 
-    let mut right = VL53L0X::new( "/dev/i2c-6").unwrap();
-    let mut left = VL53L0X::new( "/dev/i2c-7").unwrap();
+    //Use BCM numbering 
+    // Channel 4
+    let left_rear_motor = build_motor( 10, 11 ); 
+    left_rear_motor.init();
+        
+    // Channel 3
+    let right_rear_motor = build_motor( 9, 8 );
+    right_rear_motor.init();
+    
+    // Channel 2
+    let left_front_motor = build_motor( 15, 22 );
+    left_front_motor.init();
+    
+    // Channel 1
+    let right_front_motor = build_motor( 14, 27 );
+    right_front_motor.init();    
+    
+    left_rear_motor.stop();    
+    right_rear_motor.stop();
+    left_front_motor.stop();
+    right_front_motor.stop(); 
+    
+    let mut right = VL53L0X::new( "/dev/i2c-10").unwrap();
+    let mut left = VL53L0X::new( "/dev/i2c-5").unwrap();
+    let mut front = VL53L0X::new( "/dev/i2c-6").unwrap();
     
     display.clear(); 
-	display.draw_text(4, 4, "Press start...", WHITE).unwrap();
-	display.update_all().unwrap();
+    display.draw_text(4, 4, "Press start...", WHITE).unwrap();
+    display.update_all().unwrap();
     
     let mut target: i32 = 0;
     
     let mut running = false;
-	loop {
-		while let Some(Event { id, event, time }) = gilrs.next_event() {
+    loop {
+        while let Some(Event { id, event, time }) = gilrs.next_event() {
             println!("{:?} New event from {}: {:?}", time, id, event); 
             break;              
-		}
-		
-		// Start button -> running
-		if gilrs[0].is_pressed(Button::Start) {
-			target = left.read().unwrap() as i32 - right.read().unwrap() as i32;
-			display.draw_text(4, 4, "              ", WHITE).unwrap();
-			display.update().unwrap();
-			println!("Target {:?}", target); 
+        }
+        
+        // Start button -> running
+        if gilrs[0].is_pressed(Button::Start) {
+            target = left.read().unwrap() as i32 - right.read().unwrap() as i32;
+            display.draw_text(4, 4, "              ", WHITE).unwrap();
+            display.update().unwrap();
+            println!("Target {:?}", target); 
             running = true;
         } 
-		
-		
-		// Triangle and cross to exit
+        
+        
+        // Triangle and cross to exit
         if gilrs[0].is_pressed(Button::West) && gilrs[0].is_pressed(Button::South) {
             break;
         } 
         
         
-        if running {	
-                
-			let right_dist: i32 = right.read().unwrap() as i32;
-			let left_dist: i32 = left.read().unwrap() as i32;
-		
-			println!("Right {:#?}mm, Left {:#?}mm ",right_dist, left_dist);
+        if running {    
+                           
+			let mut left_rear_speed: i32;
+			let mut right_rear_speed: i32;
+			let mut left_front_speed: i32;
+			let mut right_front_speed: i32;
 			
-			let difference: i32 = target - (left_dist - right_dist);
-			
-			if difference > 10 {
-				// turn right
-				println!("Turn Right {:04}  ", difference);
-			} else if difference < -10 {
-				// turn left
-				println!("Turn Left  {:04}  ", -difference);
-			} else {
-				// straight
-				println!("Straight");
+            let right_dist: i32 = right.read().unwrap() as i32;
+            let left_dist: i32 = left.read().unwrap() as i32;
+            let front_dist: i32 = front.read().unwrap() as i32;
+            
+            println!("Front {:#?}mm, Right {:#?}mm, Left {:#?}mm ",front_dist, right_dist, left_dist);
+            
+            if front_dist < 400 {
+				left_rear_motor.stop();    
+				right_rear_motor.stop();
+				left_front_motor.stop();
+				right_front_motor.stop();  
+				break;
 			}
-			
-				
-		}
-	}
-	
-    display.clear();   
+			            
+            left_front_speed  = 1000;
+            left_rear_speed   = 1000;
+            right_front_speed = -1000;         
+            right_rear_speed  = -1000;
+            
+            let difference: i32 = (target - (left_dist - right_dist)) * 2;
+            
+            if difference > 20 {
+                // turn right
+                println!("Turn Right {:04}  ", difference);
+				left_front_speed  = left_front_speed;
+				left_rear_speed   = left_rear_speed;
+				right_front_speed = right_front_speed + difference;				
+				right_rear_speed  = right_rear_speed + difference;      
+                
+            } else if difference < -20 {
+                // turn left
+                println!("Turn Left  {:04}  ", -difference);
+                left_front_speed  = left_front_speed + difference;
+                left_rear_speed   = left_rear_speed + difference;
+				right_front_speed = right_front_speed;				
+				right_rear_speed  = right_rear_speed;      
+                
+            } else {
+                // straight
+                //println!("Straight");                
+            }
+            
+            //if left_rear_speed != 0 || right_rear_speed != 0 || left_front_speed != 0 || right_front_speed != 0  {
+				//println!(" {0}, {1}, {2}, {3} ", left_rear_speed, right_rear_speed, left_front_speed, right_front_speed );
+			//} 
+            left_rear_motor.power(left_rear_speed);
+			right_rear_motor.power(right_rear_speed);   
+			left_front_motor.power(left_front_speed);
+			right_front_motor.power(right_front_speed);                                 
+        }
+    }
+    
+    left_rear_motor.stop();    
+    right_rear_motor.stop();
+    left_front_motor.stop();
+    right_front_motor.stop();   
+    
+    display.clear();  
+    thread::sleep(interval);    
+    terminate();  
 }
 
 fn do_wheels_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
@@ -126,17 +194,21 @@ fn do_wheels_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     println!("Initialized pigpio. Version: {}", initialize().unwrap());
     let interval = time::Duration::from_millis(2000);
 
-    //Use BCM numbering
-    let left_rear_motor = build_motor( 17, 27);
+    //Use BCM numbering 
+    // Channel 4
+    let left_rear_motor = build_motor( 10, 11 ); 
     left_rear_motor.init();
         
-    let right_rear_motor = build_motor( 25, 23);
+    // Channel 3
+    let right_rear_motor = build_motor( 9, 8 );
     right_rear_motor.init();
     
-    let left_front_motor = build_motor( 10, 11);
+    // Channel 2
+    let left_front_motor = build_motor( 15, 22 );
     left_front_motor.init();
     
-    let right_front_motor = build_motor( 12, 8);
+    // Channel 1
+    let right_front_motor = build_motor( 14, 27 );
     right_front_motor.init();
     
     left_rear_motor.stop();    
@@ -144,7 +216,7 @@ fn do_wheels_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     left_front_motor.stop();
     right_front_motor.stop(); 
     
-    let servo = build_servo( 9 );
+    let servo = build_servo( 21 );
     
     let mut gear = 1;
     
@@ -275,7 +347,7 @@ fn do_mecanum_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     let right_front_motor = build_motor( 12, 8);
     right_front_motor.init();
     
-    let servo = build_servo( 9 );        
+    let servo = build_servo( 21 );        
         
     let mut gear = 1;
     
@@ -458,7 +530,7 @@ fn show_menu( display: &mut SSD1327, menu: i8) {display.clear();
 
 fn main() {
           
-    let mut display = SSD1327::new("/dev/i2c-9");
+    let mut display = SSD1327::new("/dev/i2c-3");
     display.begin().unwrap(); 
     
     display.clear();
