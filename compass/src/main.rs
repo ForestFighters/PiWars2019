@@ -96,7 +96,7 @@ fn main() {
 	
 	const ADDRESS: u16	= 0x1E;
 	
-	let mut compass = HMC5883L::new( "/dev/i2c-9", ADDRESS).unwrap();
+	let mut compass = HMC5883L::new( "/dev/i2c-1", ADDRESS).unwrap();
 	
 	loop {
 		let heading = compass.read_degrees().unwrap();
