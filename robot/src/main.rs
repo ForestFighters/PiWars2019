@@ -10,7 +10,7 @@ use std::{thread, time};
 use rust_pigpio::*;
 
 use gilrs::{Gilrs, Button, Event };
-use gilrs::Axis::{LeftZ, RightZ, LeftStickX, LeftStickY, DPadY, DPadX};
+use gilrs::Axis::{LeftZ, RightZ, RightStickX, RightStickY, LeftStickX, LeftStickY, DPadY, DPadX};
 
 use robot::servo::*;
 use robot::motor::*;
@@ -209,7 +209,7 @@ fn do_wheels_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     
     // Channel 1
     let right_front_motor = build_motor( 14, 27 );
-    right_front_motor.init();
+    right_front_motor.init();    
     
     left_rear_motor.stop();    
     right_rear_motor.stop();
@@ -236,13 +236,27 @@ fn do_wheels_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
             left_stick_y = (gilrs[0].axis_data(LeftStickY).unwrap().value() * 1000.0) as i32;
         }
         
+        // PS4 controller
+        if gilrs[0].axis_data(RightStickY).is_some() {               
+            right_stick_y = (gilrs[0].axis_data(RightStickY).unwrap().value() * 1000.0) as i32;
+        }
+        if gilrs[0].is_pressed(Button::DPadUp) {
+            dpad = 1;
+        }        
+        if gilrs[0].is_pressed(Button::DPadDown) {
+            dpad = -1;
+        }
+       
+       
+        // PiHut controller  
         if gilrs[0].axis_data(RightZ).is_some() {               
             right_stick_y = (gilrs[0].axis_data(RightZ).unwrap().value() * -1000.0) as i32;
-        }
-        
+        }        
         if gilrs[0].axis_data(DPadY).is_some() {                
             dpad = (gilrs[0].axis_data(DPadY).unwrap().value()) as i32;
         }   
+        
+        
                     
         // Gear changing
         if gilrs[0].is_pressed(Button::North) {
@@ -563,11 +577,11 @@ fn main() {
             break;              
         }
         
-        if gilrs[0].axis_data(DPadX).is_some() && gilrs[0].axis_data(DPadX).unwrap().value() == 1.0 {                
+        if ( gilrs[0].axis_data(DPadX).is_some() && gilrs[0].axis_data(DPadX).unwrap().value() == 1.0 ) || gilrs[0].is_pressed(Button::DPadRight) {                
             menu = menu + 1;
         }  
         
-        if gilrs[0].axis_data(DPadX).is_some() && gilrs[0].axis_data(DPadX).unwrap().value() == -1.0 {                
+        if ( gilrs[0].axis_data(DPadX).is_some() && gilrs[0].axis_data(DPadX).unwrap().value() == -1.0 ) || gilrs[0].is_pressed(Button::DPadLeft) {                
             menu = menu - 1;
         }
         

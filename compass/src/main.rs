@@ -101,7 +101,7 @@ fn main() {
 	loop {
 		let heading = compass.read_degrees().unwrap();
 		println!("heading={:.*}", 1, heading);
-        thread::sleep(Duration::from_millis(500));
+		thread::sleep(Duration::from_millis(500));
 	}
 	    
 }
