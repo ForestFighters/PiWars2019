@@ -1,0 +1,10 @@
+[package]
+name = "ws2812"
+version = "0.1.0"
+authors = ["ptbw <ptbwillis@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+byteorder = "1.2.6"
+rs_ws281x = "0.2.3"
+
