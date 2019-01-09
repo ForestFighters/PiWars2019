@@ -41,14 +41,20 @@ fn get_colour(mut frame: core::Mat) -> Result<i32,String> {
 	let red_lower = core::Scalar{ data:[150f64,128f64,0f64,-1f64] };	
 	let red_upper = core::Scalar{ data:[230f64,255f64,255f64,-1f64] };
 	
-	let green_lower = core::Scalar{ data:[51f64,127f64,127f64,-1f64] };	
-	let green_upper = core::Scalar{ data:[75f64,255f64,255f64,-1f64] };
+	//let green_lower = core::Scalar{ data:[51f64,127f64,127f64,-1f64] };	
+	//let green_upper = core::Scalar{ data:[75f64,255f64,255f64,-1f64] };
+	
+	let green_lower = core::Scalar{ data:[55f64,60f64,91f64,-1f64] };	
+	let green_upper = core::Scalar{ data:[96f64,192f64,255f64,-1f64] };
 	
 	let blue_lower = core::Scalar{ data:[75f64,127f64,127f64,-1f64] };	
 	let blue_upper = core::Scalar{ data:[107f64,255f64,255f64,-1f64] };
 	
-	let yellow_lower = core::Scalar{ data:[20f64,85f64,150f64,-1f64] };	
-	let yellow_upper = core::Scalar{ data:[35f64,255f64,255f64,-1f64] };
+	//let yellow_lower = core::Scalar{ data:[20f64,85f64,150f64,-1f64] };	
+	//let yellow_upper = core::Scalar{ data:[35f64,255f64,255f64,-1f64] };
+	
+	let yellow_lower = core::Scalar{ data:[10f64,170f64,150f64,-1f64] };	
+	let yellow_upper = core::Scalar{ data:[49f64,255f64,255f64,-1f64] };
 	
 	let window = "Video Capture";
 	try!(highgui::named_window(window,1));
@@ -132,27 +138,32 @@ fn get_colour(mut frame: core::Mat) -> Result<i32,String> {
 		//println!("Area {:#?}",area);
 		if area > 5000f64
 		{
+			try!(highgui::imshow(window2, &mut img_final));	
 			if *colour == red || *colour == red2 {
 				try!(core::rectangle(&mut frame2,core::Rect{x:0,y:0,width:30,height:30},core::Scalar{ data:[0f64,0f64,255f64,-1f64] },-1 ,8 ,0));				
-				ret = red;							
+				ret = red;	
+				break;						
 			}
 			else if *colour == green {
 				try!(core::rectangle(&mut frame2,core::Rect{x:0,y:0,width:30,height:30},core::Scalar{ data:[0f64,255f64,0f64,-1f64] },-1 ,8 ,0));				
 				ret = green;				
+				break;
 			}
 			else if *colour == blue {	
 				try!(core::rectangle(&mut frame2,core::Rect{x:0,y:0,width:30,height:30},core::Scalar{ data:[255f64,0f64,0f64,-1f64] },-1 ,8 ,0));				
 				ret = blue;				
+				break;
 			}
 			else if *colour == yellow {	
 				try!(core::rectangle(&mut frame2,core::Rect{x:0,y:0,width:30,height:30},core::Scalar{ data:[0f64,255f64,255f64,-1f64] },-1 ,8 ,0));				
 				ret = yellow;
+				break;
 			}
-			//try!(highgui::imshow(window2, &mut img_final));			
+					
 		}		
     }
-    //try!(highgui::imshow(window, &mut frame2));
-	//try!(highgui::wait_key(5));
+    try!(highgui::imshow(window, &mut frame2));
+	try!(highgui::wait_key(5));
 	
 	println!("Now {:#?}",Instant::now().duration_since(now));
 	

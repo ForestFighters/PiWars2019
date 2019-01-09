@@ -17,6 +17,7 @@ use robot::motor::*;
 use robot::ssd1327::*;
 use robot::hmc5883l::*;
 use robot::vl53l0x::*;
+use robot::camera::*;
 
 
 fn _test() {
@@ -37,6 +38,17 @@ fn _test() {
     println!("Back Distance {:.*}", 1, back.read().unwrap());
         
 }
+
+fn _test2() {
+		
+	let mut cam = build_camera( );
+	
+	while true {
+		let mat = cam.get_frame( );
+		let colour = cam.get_colour( mat );			
+	}	
+}
+	
 
 fn do_canyon( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     

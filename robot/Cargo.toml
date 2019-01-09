@@ -10,3 +10,11 @@ i2cdev = "0.4.0"
 byteorder = "1.2.6"
 font8x8 = { version = "0.2", default-features = false }
 image = "0.20.1"
+libc = "0.2"
+opencv = "0.2.3"
+time = "0.1.40"
+
+[build-dependencies]
+pkg-config = "0.3"
+gcc = "0.3"
+glob = "0.2"
