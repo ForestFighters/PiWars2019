@@ -3,6 +3,7 @@ extern crate i2cdev;
 extern crate byteorder;
 extern crate gilrs;
 extern crate image;
+extern crate rs_ws281x;
 
 extern crate robot;
 
@@ -18,6 +19,7 @@ use robot::ssd1327::*;
 use robot::hmc5883l::*;
 use robot::vl53l0x::*;
 
+use rs_ws281x::*;
 
 fn _test() {
         
@@ -97,6 +99,8 @@ fn do_straight( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     
     let mut target: i32 = 0;
     
+    let mut gear = 3;
+    
     let mut running = false;
     loop {
         while let Some(Event { id, event, time }) = gilrs.next_event() {
@@ -133,22 +137,27 @@ fn do_straight( display: &mut SSD1327, gilrs: &mut Gilrs ) {
             
             println!("Front {:#?}mm, Right {:#?}mm, Left {:#?}mm ",front_dist, right_dist, left_dist);
             
-            if front_dist < 400 {
-				left_rear_motor.stop();    
-				right_rear_motor.stop();
-				left_front_motor.stop();
-				right_front_motor.stop();  
-				break;
-			}
+            //if front_dist < 400 {
+				//left_rear_motor.stop();    
+				//right_rear_motor.stop();
+				//left_front_motor.stop();
+				//right_front_motor.stop();  
+				//break;
+			//}
 			            
             left_front_speed  = 1000;
             left_rear_speed   = 1000;
             right_front_speed = -1000;         
             right_rear_speed  = -1000;
             
-            let difference: i32 = (target - (left_dist - right_dist)) * 2;
+            left_front_speed  = left_front_speed / gear;
+            right_front_speed = right_front_speed / gear;
+            left_rear_speed   = left_rear_speed / gear;
+            right_rear_speed  = right_rear_speed / gear;        
             
-            if difference > 20 {
+            let difference: i32 = (target - (left_dist - right_dist)) * 3;
+            
+            if difference > 15 {
                 // turn right
                 println!("Turn Right {:04}  ", difference);
 				left_front_speed  = left_front_speed;
@@ -156,7 +165,7 @@ fn do_straight( display: &mut SSD1327, gilrs: &mut Gilrs ) {
 				right_front_speed = right_front_speed + difference;				
 				right_rear_speed  = right_rear_speed + difference;      
                 
-            } else if difference < -20 {
+            } else if difference < -15 {
                 // turn left
                 println!("Turn Left  {:04}  ", -difference);
                 left_front_speed  = left_front_speed + difference;
@@ -330,9 +339,9 @@ fn do_wheels_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
         left_rear_motor.power(left_rear_speed);
         right_rear_motor.power(right_rear_speed);   
         left_front_motor.power(left_front_speed);
-        right_front_motor.power(right_front_speed);     
-            
+        right_front_motor.power(right_front_speed);             
     } 
+    
     left_rear_motor.stop();    
     right_rear_motor.stop();
     left_front_motor.stop();
@@ -542,6 +551,32 @@ fn show_menu( display: &mut SSD1327, menu: i8) {display.clear();
     
 }
 
+fn all_on( controller: &mut Controller )
+{	
+	let leds = controller.leds_mut(0);
+	
+	leds[0] = [ 0, 0, 255, 0];
+	leds[1] = [ 0, 0, 255, 0];
+	leds[2] = [ 0, 0, 255, 0];
+	leds[3] = [ 0, 0, 255, 0];
+	leds[4] = [ 0, 0, 255, 0];
+	leds[5] = [ 0, 0, 255, 0];    
+    
+} 
+
+fn all_off( controller: &mut Controller )
+{
+	let leds = controller.leds_mut(0);
+	
+	leds[0] = [ 0, 0, 0, 0];
+	leds[1] = [ 0, 0, 0, 0];
+	leds[2] = [ 0, 0, 0, 0];
+	leds[3] = [ 0, 0, 0, 0];
+	leds[4] = [ 0, 0, 0, 0];
+	leds[5] = [ 0, 0, 0, 0];    
+    
+} 
+
 fn main() {
           
     let mut display = SSD1327::new("/dev/i2c-3");
@@ -551,7 +586,23 @@ fn main() {
     display.draw_text(20, 42, "Forest", WHITE).unwrap();
     display.draw_text(20, 50, "Fighters", WHITE).unwrap();
     display.draw_text(20, 58, "Ready...", WHITE).unwrap();
-    display.update_all().unwrap();   
+    display.update_all().unwrap(); 
+    
+    let mut controller = ControllerBuilder::new()		
+		.freq(800_000)		
+		.dma(10)
+		.channel( 0, 
+			ChannelBuilder::new()
+				.pin(12)
+				.count(6)
+				.strip_type(StripType::Ws2812)
+				.brightness(50)
+				.build()
+		 )
+		.build().unwrap();
+        
+    all_on( &mut controller );
+    controller.render().unwrap();
     
     let mut gilrs = Gilrs::new().unwrap();
     
@@ -642,6 +693,11 @@ fn main() {
     }
     
     thread::sleep(time::Duration::from_millis(2000));
+    
+    all_off( &mut controller );
+    controller.render().unwrap();
+    
+    
     display.clear(); 
     display.update_all().unwrap();  
     

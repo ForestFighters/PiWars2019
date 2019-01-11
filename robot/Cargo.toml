@@ -10,3 +10,4 @@ i2cdev = "0.4.0"
 byteorder = "1.2.6"
 font8x8 = { version = "0.2", default-features = false }
 image = "0.20.1"
+rs_ws281x = "0.2.3"
