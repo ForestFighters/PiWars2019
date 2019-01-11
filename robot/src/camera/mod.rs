@@ -7,7 +7,8 @@ use self::opencv::core;
 use self::opencv::highgui;
 use self::opencv::imgproc;
 
-pub struct Camera {		
+pub struct Camera {	
+	
     pub cam: highgui::VideoCapture,
     
     pub red2_lower: core::Scalar,
@@ -33,11 +34,17 @@ pub struct Camera {
 	pub colours: [ i32; 5], 
 }
 
-impl Camera {    
-    
+impl Camera {   
+	
     pub fn init( &mut self ){               
                 
     }
+    
+    pub fn search_colour( &mut self, colour_to_find: i32 ) -> bool {
+		let mat = self.get_frame( );
+		let colour = self.get_colour( mat ).unwrap();	
+		return colour == colour_to_find;
+	}
     
     pub fn get_frame( &mut self ) -> core::Mat {
         let mut frame = core::Mat::new().unwrap();
@@ -48,7 +55,7 @@ impl Camera {
     pub fn get_colour(&mut self, mut frame: core::Mat) -> Result<i32,String> {
 	
 		let now = Instant::now();
-		println!("Start {:#?}",Instant::now().duration_since(now));
+		//println!("Start {:#?}",Instant::now().duration_since(now));
 	
 		let mut ret = -1;	
 		
@@ -58,7 +65,7 @@ impl Camera {
 		let window2 = "Overlay";
 		try!(highgui::named_window(window2,1));
 	    
-		println!("Now {:#?}",Instant::now().duration_since(now));
+		//println!("Now {:#?}",Instant::now().duration_since(now));
     
 		if try!(frame.size()).width == 0 {
 			println!("Failed to create camera frame");
@@ -66,16 +73,16 @@ impl Camera {
 			return Ok(ret);
 		}
 		
-		println!("Now {:#?}",Instant::now().duration_since(now));
+		//println!("Now {:#?}",Instant::now().duration_since(now));
 			
 		let mut frame2 = try!(core::Mat::rect( &frame, core::Rect{x:0,y:200,width:640,height:80}) );
 						
 		let mut img_hsv = try!(core::Mat::new());
-		try!(imgproc::cvt_color(&mut frame, &mut img_hsv, imgproc::COLOR_BGR2HSV, 0));
+		try!(imgproc::cvt_color(&mut frame2, &mut img_hsv, imgproc::COLOR_BGR2HSV, 0));
 		
 		let mut img_thresholded = try!(core::Mat::new());
 		
-		println!("Now {:#?}",Instant::now().duration_since(now));				
+		//println!("Now {:#?}",Instant::now().duration_since(now));				
 		
 		for colour in self.colours.iter()
 		{
@@ -156,7 +163,7 @@ impl Camera {
 		try!(highgui::imshow(window, &mut frame2));
 		try!(highgui::wait_key(5));
 		
-		println!("Now {:#?}",Instant::now().duration_since(now));
+		//println!("Now {:#?}",Instant::now().duration_since(now));
 		
 		Ok(ret)
 	} 
@@ -179,14 +186,17 @@ pub fn build_camera( ) -> Camera {
 	let red_lower = core::Scalar{ data:[150f64,128f64,0f64,-1f64] };	
 	let red_upper = core::Scalar{ data:[230f64,255f64,255f64,-1f64] };
 			
-	let green_lower = core::Scalar{ data:[55f64,60f64,91f64,-1f64] };	
-	let green_upper = core::Scalar{ data:[96f64,192f64,255f64,-1f64] };
+	let green_lower = core::Scalar{ data:[55f64,60f64,91f64,-1f64] };	// 24 0		0
+	let green_upper = core::Scalar{ data:[96f64,192f64,255f64,-1f64] }; // 91 255	255
 		
 	let blue_lower = core::Scalar{ data:[75f64,127f64,127f64,-1f64] };	
 	let blue_upper = core::Scalar{ data:[107f64,255f64,255f64,-1f64] };
+	
+	//let yellow_lower = core::Scalar{ data:[10f64,170f64,150f64,-1f64] };	
+	//let yellow_upper = core::Scalar{ data:[49f64,255f64,255f64,-1f64] }; 
 			
-	let yellow_lower = core::Scalar{ data:[10f64,170f64,150f64,-1f64] };	
-	let yellow_upper = core::Scalar{ data:[49f64,255f64,255f64,-1f64] }; 
+	let yellow_lower = core::Scalar{ data:[10f64,  0f64,164f64,-1f64] };	
+	let yellow_upper = core::Scalar{ data:[48f64,140f64,255f64,-1f64] }; 
 			
     Camera {        
         cam,
