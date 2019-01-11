@@ -3,14 +3,13 @@ extern crate i2cdev;
 extern crate byteorder;
 extern crate gilrs;
 extern crate image;
-extern crate rs_ws281x;
 
 extern crate robot;
 
 use std::{thread, time};
 use rust_pigpio::*;
 
-use gilrs::{Gilrs, Button, Event };
+use gilrs::{Gilrs, Button, Event, EventType };
 use gilrs::Axis::{LeftZ, RightZ, RightStickX, RightStickY, LeftStickX, LeftStickY, DPadY, DPadX};
 
 use robot::servo::*;
@@ -19,7 +18,7 @@ use robot::ssd1327::*;
 use robot::hmc5883l::*;
 use robot::vl53l0x::*;
 use robot::camera::*;
-use rs_ws281x::*;
+use robot::pixel::*;
 
 enum Activities { Waiting, Searching, MoveTowards, MoveAway, Complete, Done, Finished, Test }
 
@@ -31,21 +30,27 @@ const GREEN: i32 = 4;
 const DONE: i32 = 5;
 
 fn _test() {
-        
+       
     // Test compass
     let mut compass = HMC5883L::new("/dev/i2c-9").unwrap();
-    println!("Current Heading {:.*}", 1, compass.read_degrees().unwrap());
     
     // Test distance sensors
-    let mut front = VL53L0X::new( "/dev/i2c-5").unwrap();
-    let mut right = VL53L0X::new( "/dev/i2c-6").unwrap();
-    let mut left = VL53L0X::new( "/dev/i2c-7").unwrap();
-    let mut back = VL53L0X::new( "/dev/i2c-8").unwrap(); 
-    
-    println!("Front Distance {:.*}", 1, front.read().unwrap());
-    println!("Right Distance {:.*}", 1, right.read().unwrap());
-    println!("Left Distance {:.*}", 1, left.read().unwrap());
-    println!("Back Distance {:.*}", 1, back.read().unwrap());
+    let mut leftfront = VL53L0X::new( "/dev/i2c-5").unwrap();
+    let mut leftback = VL53L0X::new( "/dev/i2c-6").unwrap();
+    let mut back = VL53L0X::new( "/dev/i2c-7").unwrap();
+    let mut front = VL53L0X::new( "/dev/i2c-8").unwrap();
+    let mut rightfront = VL53L0X::new( "/dev/i2c-10").unwrap(); 
+    let mut rightback = VL53L0X::new( "/dev/i2c-9").unwrap();
+
+    loop {
+        println!("\x1B[HCurrent Heading {:.*}  ", 1, compass.read_degrees().unwrap());
+        println!("Left Back Distance   {:.*}   ", 1, leftback.read().unwrap());
+        println!("Left Front Distance  {:.*}   ", 1, leftfront.read().unwrap());
+        println!("Back Distance        {:.*}   ", 1, back.read().unwrap());
+        println!("Front Distance       {:.*}   ", 1, front.read().unwrap());
+        println!("Right Back Distance  {:.*}   ", 1, rightback.read().unwrap());
+        println!("Right Front Distance {:.*}   ", 1, rightfront.read().unwrap());  
+    }
         
 }
 
@@ -98,8 +103,13 @@ fn inc_colour( colour: i32 ) -> i32 {
 	}					
 }
  
-fn do_hubble( /* display: &mut SSD1327, */ gilrs: &mut Gilrs, mut locations: [ i32; 4 ] ) {	
-		
+fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs, mut locations: [ i32; 4 ] ) {	
+    
+    let mut pixel = build_pixel();
+    
+    //Use BCM numbering    
+	println!("Initialized pigpio. Version: {}", initialize().unwrap());
+    
 	let mut current = RED;
 	
 	let mut activity = Activities::Waiting;
@@ -110,22 +120,22 @@ fn do_hubble( /* display: &mut SSD1327, */ gilrs: &mut Gilrs, mut locations: [ i
 	let mut got_Yellow = false;
 	let mut got_Green = false;
 	
-    //let left_rear_motor = build_motor( 10, 11 ); 
-    //left_rear_motor.init();
+    let left_rear_motor = build_motor( 10, 11 ); 
+    left_rear_motor.init();
         
-    //let right_rear_motor = build_motor( 9, 8 );
-    //right_rear_motor.init();
+    let right_rear_motor = build_motor( 9, 8 );
+    right_rear_motor.init();
     
-    //let left_front_motor = build_motor( 15, 22 );
-    //left_front_motor.init();
+    let left_front_motor = build_motor( 15, 22 );
+    left_front_motor.init();
 
-    //let right_front_motor = build_motor( 14, 27 );
-    //right_front_motor.init();    
+    let right_front_motor = build_motor( 14, 27 );
+    right_front_motor.init();    
     
-    //left_rear_motor.stop();    
-    //right_rear_motor.stop();
-    //left_front_motor.stop();
-    //right_front_motor.stop(); 
+    left_rear_motor.stop();    
+    right_rear_motor.stop();
+    left_front_motor.stop();
+    right_front_motor.stop(); 
 	
 	let mut cam = build_camera( );
 	
@@ -146,8 +156,8 @@ fn do_hubble( /* display: &mut SSD1327, */ gilrs: &mut Gilrs, mut locations: [ i
 		// Start button -> running
         if gilrs[0].is_pressed(Button::Start) {            
 			println!("Started"); 
-			//display.draw_text(4, 4, "              ", WHITE).unwrap();
-			//display.update().unwrap();
+			display.draw_text(4, 4, "              ", WHITE).unwrap();
+			display.update().unwrap();
 			running = true;
         } 
                 
@@ -179,16 +189,20 @@ fn do_hubble( /* display: &mut SSD1327, */ gilrs: &mut Gilrs, mut locations: [ i
 		}			
 	}
         
-    //display.clear();   
+    display.clear();   
+    pixel.all_off();      
+    terminate();  
 }
 
 
 fn do_straight( display: &mut SSD1327, gilrs: &mut Gilrs ) {
-       
+    
+    let mut pixel = build_pixel();
+    
+    //Use BCM numbering    
 	println!("Initialized pigpio. Version: {}", initialize().unwrap());
     let interval = time::Duration::from_millis(2000);
 
-    //Use BCM numbering 
     // Channel 4
     let left_rear_motor = build_motor( 10, 11 ); 
     left_rear_motor.init();
@@ -209,10 +223,13 @@ fn do_straight( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     right_rear_motor.stop();
     left_front_motor.stop();
     right_front_motor.stop(); 
-    
-    let mut right = VL53L0X::new( "/dev/i2c-10").unwrap();
+        
     let mut left = VL53L0X::new( "/dev/i2c-5").unwrap();
-    let mut front = VL53L0X::new( "/dev/i2c-6").unwrap();
+    let mut front = VL53L0X::new( "/dev/i2c-8").unwrap();
+    let mut right = VL53L0X::new( "/dev/i2c-10").unwrap(); 
+    
+    pixel.all_on(); 
+    pixel.render();
     
     display.clear(); 
     display.draw_text(4, 4, "Press start...", WHITE).unwrap();
@@ -222,31 +239,33 @@ fn do_straight( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     
     let mut gear = 3;
     
+    let mut quit = false;
     let mut running = false;
-    loop {
-        while let Some(Event { id, event, time }) = gilrs.next_event() {
-            println!("{:?} New event from {}: {:?}", time, id, event); 
-            break;              
-        }
+    while !quit {
         
-        // Start button -> running
-        if gilrs[0].is_pressed(Button::Start) {
-            target = left.read().unwrap() as i32 - right.read().unwrap() as i32;
-            display.draw_text(4, 4, "              ", WHITE).unwrap();
-            display.update().unwrap();
-            println!("Target {:?}", target); 
-            running = true;
-        } 
-        
-        
-        // Triangle and cross to exit
-        if gilrs[0].is_pressed(Button::West) && gilrs[0].is_pressed(Button::South) {
-            break;
-        } 
-        
-        
-        if running {    
-                           
+        while let Some(event) = gilrs.next_event() {
+            match event {
+            Event { id, event: EventType::ButtonPressed(Button::Start, _), .. } => {
+                println!("Select Pressed");
+                // Start button -> running                    
+                pixel.all_off();
+                target = left.read().unwrap() as i32 - right.read().unwrap() as i32;
+                display.draw_text(4, 4, "              ", WHITE).unwrap();
+                display.update().unwrap();
+                println!("Target {:?}", target); 
+                running = true;
+            }
+            Event { id, event: EventType::ButtonPressed(Button::Mode, _), .. } => {
+                println!("DPad Right");
+                // Mode to exit                    
+                quit = true;
+                break;                    
+            }
+            _ => (),
+            };
+        }    
+       
+        if running {                            
 			let mut left_rear_speed: i32;
 			let mut right_rear_speed: i32;
 			let mut left_front_speed: i32;
@@ -254,17 +273,18 @@ fn do_straight( display: &mut SSD1327, gilrs: &mut Gilrs ) {
 			
             let right_dist: i32 = right.read().unwrap() as i32;
             let left_dist: i32 = left.read().unwrap() as i32;
-            let front_dist: i32 = front.read().unwrap() as i32;
-            
-            println!("Front {:#?}mm, Right {:#?}mm, Left {:#?}mm ",front_dist, right_dist, left_dist);
-            
-            //if front_dist < 400 {
-				//left_rear_motor.stop();    
-				//right_rear_motor.stop();
-				//left_front_motor.stop();
-				//right_front_motor.stop();  
-				//break;
-			//}
+                        
+            {
+                //let front_dist: i32 = front.read().unwrap() as i32;
+                //println!("Front {:#?}mm, Right {:#?}mm, Left {:#?}mm ",front_dist, right_dist, left_dist);            
+                //if front_dist < 400 {
+                    //left_rear_motor.stop();    
+                    //right_rear_motor.stop();
+                    //left_front_motor.stop();
+                    //right_front_motor.stop();  
+                    //break;
+                //}
+            }
 			            
             left_front_speed  = 1000;
             left_rear_speed   = 1000;
@@ -279,7 +299,9 @@ fn do_straight( display: &mut SSD1327, gilrs: &mut Gilrs ) {
             let difference: i32 = (target - (left_dist - right_dist)) * 3;
             
             if difference > 15 {
-                // turn right
+                // turn right            
+                pixel.right_on();
+                pixel.render();
                 println!("Turn Right {:04}  ", difference);
 				left_front_speed  = left_front_speed;
 				left_rear_speed   = left_rear_speed;
@@ -288,20 +310,25 @@ fn do_straight( display: &mut SSD1327, gilrs: &mut Gilrs ) {
                 
             } else if difference < -15 {
                 // turn left
+                pixel.left_on();
+                pixel.render();
                 println!("Turn Left  {:04}  ", -difference);
                 left_front_speed  = left_front_speed + difference;
                 left_rear_speed   = left_rear_speed + difference;
 				right_front_speed = right_front_speed;				
 				right_rear_speed  = right_rear_speed;      
                 
-            } else {
-                // straight
-                //println!("Straight");                
+            } else {                
+                //println!("Straight");       
+                pixel.all_off();                         
+                pixel.render();
             }
             
-            //if left_rear_speed != 0 || right_rear_speed != 0 || left_front_speed != 0 || right_front_speed != 0  {
-				//println!(" {0}, {1}, {2}, {3} ", left_rear_speed, right_rear_speed, left_front_speed, right_front_speed );
-			//} 
+            {
+                //if left_rear_speed != 0 || right_rear_speed != 0 || left_front_speed != 0 || right_front_speed != 0  {
+                    //println!(" {0}, {1}, {2}, {3} ", left_rear_speed, right_rear_speed, left_front_speed, right_front_speed );
+                //} 
+            }
             left_rear_motor.power(left_rear_speed);
 			right_rear_motor.power(right_rear_speed);   
 			left_front_motor.power(left_front_speed);
@@ -315,12 +342,12 @@ fn do_straight( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     right_front_motor.stop();   
     
     display.clear();  
+    pixel.all_off();  
     thread::sleep(interval);    
     terminate();  
 }
 
 fn do_wheels_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
-    
     println!("Initialized pigpio. Version: {}", initialize().unwrap());
     let interval = time::Duration::from_millis(2000);
 
@@ -332,103 +359,80 @@ fn do_wheels_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     // Channel 3
     let right_rear_motor = build_motor( 9, 8 );
     right_rear_motor.init();
-    
+
     // Channel 2
     let left_front_motor = build_motor( 15, 22 );
     left_front_motor.init();
-    
+
     // Channel 1
     let right_front_motor = build_motor( 14, 27 );
     right_front_motor.init();    
-    
+
     left_rear_motor.stop();    
     right_rear_motor.stop();
     left_front_motor.stop();
     right_front_motor.stop(); 
-    
+
     let servo = build_servo( 21 );
-    
+
     let mut gear = 1;
-    
-    
-    loop {
-        while let Some(Event { id, event, time }) = gilrs.next_event() {
-                println!("{:?} New event from {}: {:?}", time, id, event); 
-                break;              
-            }
-                    
+    let mut quit = false;
+    while !quit{
+        
         let mut left_stick_y = 0;
         let mut right_stick_y = 0;        
-        
-        let mut dpad = 0;
-                
-        if gilrs[0].axis_data(LeftStickY).is_some() {               
-            left_stick_y = (gilrs[0].axis_data(LeftStickY).unwrap().value() * 1000.0) as i32;
-        }
-        
-        // PS4 controller
-        if gilrs[0].axis_data(RightStickY).is_some() {               
-            right_stick_y = (gilrs[0].axis_data(RightStickY).unwrap().value() * 1000.0) as i32;
-        }
-        if gilrs[0].is_pressed(Button::DPadUp) {
-            dpad = 1;
-        }        
-        if gilrs[0].is_pressed(Button::DPadDown) {
-            dpad = -1;
-        }
+        let value: f32 = 0.0;
+        while let Some(event) = gilrs.next_event() {
+            match event {
+                 Event { id, event: EventType::ButtonPressed(Button::Mode, _), .. } => {
+                     println!("Mode Pressed");
+                     quit = true;
+                     break;
+                 }
+                 Event { id, event: EventType::ButtonPressed(Button::DPadUp, _), .. } => {
+                     println!("DPad Up Pressed");
+                     servo.set_pulse_width( 2500 );
+                 }
+                 Event { id, event: EventType::ButtonPressed(Button::DPadDown, _), .. } => {
+                     println!("DPad Up Pressed");
+                     servo.set_pulse_width( 500 );
+                 }
+                 Event { id, event: EventType::ButtonPressed(Button::North, _), .. } => {
+                    gear = 1;
+                    display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
+                    display.update().unwrap();  
+                    println!(" {0} ",gear); 
+                 }
+                 Event { id, event: EventType::ButtonPressed(Button::West, _), .. } => {
+                    gear = 2;
+                    display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
+                    display.update().unwrap();  
+                    println!(" {0} ",gear); 
+                 }
+                 Event { id, event: EventType::ButtonPressed(Button::East, _), .. } => {
+                    gear = 3;
+                    display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
+                    display.update().unwrap();  
+                    println!(" {0} ",gear); 
+                 }
+                 Event { id, event: EventType::ButtonPressed(Button::South, _), .. } => {
+                    gear = 4;
+                    display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
+                    display.update().unwrap();  
+                    println!(" {0} ",gear); 
+                 }
+                 Event { id, event: EventType::AxisChanged(LeftStickY, value, _), .. } => {
+                     println!("Left Stick Y {:?}", value);
+                     left_stick_y = (value * 1000.0) as i32;
+                 }
+                 Event { id, event: EventType::AxisChanged(RightStickY, value, _), .. } => {
+                     println!("Right Stick Y {:?}", value);
+                     right_stick_y = (value * 1000.0) as i32;
+                 }
+                 _ => (),
+             };
+         }                            
        
-       
-        // PiHut controller  
-        if gilrs[0].axis_data(RightZ).is_some() {               
-            right_stick_y = (gilrs[0].axis_data(RightZ).unwrap().value() * -1000.0) as i32;
-        }        
-        if gilrs[0].axis_data(DPadY).is_some() {                
-            dpad = (gilrs[0].axis_data(DPadY).unwrap().value()) as i32;
-        }   
-        
-        
-                    
-        // Gear changing
-        if gilrs[0].is_pressed(Button::North) {
-            gear = 1;
-            display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
-            display.update().unwrap();  
-            println!(" {0} ",gear);         
-        }
-        
-        if gilrs[0].is_pressed(Button::West) {
-            gear = 2;
-            display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
-            display.update().unwrap();  
-            println!(" {0} ",gear);         
-        }
-        
-        if gilrs[0].is_pressed(Button::East) {
-            gear = 3;           
-            display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
-            display.update().unwrap();  
-            println!(" {0} ",gear);
-        }
-        
-        if gilrs[0].is_pressed(Button::South) {
-            gear = 4;           
-            display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
-            display.update().unwrap();  
-            println!(" {0} ",gear);
-        }
-            
-        // Triangle and cross to exit
-        if gilrs[0].is_pressed(Button::West) && gilrs[0].is_pressed(Button::South) {
-            break;
-        }  
-        
-        if dpad == 1 {
-            servo.set_pulse_width( 2500 );
-        }
-        else if dpad == -1 {
-            servo.set_pulse_width( 500 );
-        }
-        
         let mut left_rear_speed: i32;
         let mut right_rear_speed: i32;
         let mut left_front_speed: i32;
@@ -453,21 +457,23 @@ fn do_wheels_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
         left_rear_speed   = left_rear_speed / gear;
         right_rear_speed  = right_rear_speed / gear;        
         
-        //if left_rear_speed != 0 || right_rear_speed != 0 || left_front_speed != 0 || right_front_speed != 0  {
-            //println!(" {0}, {1}, {2}, {3} ", left_rear_speed, right_rear_speed, left_front_speed, right_front_speed );
-        //}   
         
+        if left_rear_speed != 0 || right_rear_speed != 0 || left_front_speed != 0 || right_front_speed != 0  {
+            println!(" {0}, {1}, {2}, {3} ", left_rear_speed, right_rear_speed, left_front_speed, right_front_speed );
+        }   
+    
+            
         left_rear_motor.power(left_rear_speed);
         right_rear_motor.power(right_rear_speed);   
         left_front_motor.power(left_front_speed);
         right_front_motor.power(right_front_speed);             
     } 
-    
+
     left_rear_motor.stop();    
     right_rear_motor.stop();
     left_front_motor.stop();
     right_front_motor.stop();   
-    
+
     display.clear();  
     thread::sleep(interval);    
     terminate();
@@ -559,7 +565,7 @@ fn do_mecanum_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
             println!(" {0} ",gear);
         }
                     
-        if gilrs[0].is_pressed(Button::West) && gilrs[0].is_pressed(Button::South) {
+        if gilrs[0].is_pressed(Button::Mode) {
             break;
         }
                 
@@ -672,62 +678,12 @@ fn show_menu( display: &mut SSD1327, menu: i8) {display.clear();
     
 }
 
-fn all_on( controller: &mut Controller )
-{	
-	let leds = controller.leds_mut(0);
-	
-	leds[0] = [ 0, 0, 255, 0];
-	leds[1] = [ 0, 0, 255, 0];
-	leds[2] = [ 0, 0, 255, 0];
-	leds[3] = [ 0, 0, 255, 0];
-	leds[4] = [ 0, 0, 255, 0];
-	leds[5] = [ 0, 0, 255, 0];    
-    
-} 
-
-fn all_off( controller: &mut Controller )
-{
-	let leds = controller.leds_mut(0);
-	
-	leds[0] = [ 0, 0, 0, 0];
-	leds[1] = [ 0, 0, 0, 0];
-	leds[2] = [ 0, 0, 0, 0];
-	leds[3] = [ 0, 0, 0, 0];
-	leds[4] = [ 0, 0, 0, 0];
-	leds[5] = [ 0, 0, 0, 0];    
-    
-} 
-
 fn main() {
-	
+
 	// A list of locations, colours are updated when found.
 	let mut locations = [ NONE, NONE, NONE, NONE ];  
 		
-    let mut gilrs = Gilrs::new().unwrap();     
-    
-    display.clear();
-    display.draw_text(20, 42, "Forest", WHITE).unwrap();
-    display.draw_text(20, 50, "Fighters", WHITE).unwrap();
-    display.draw_text(20, 58, "Ready...", WHITE).unwrap();
-    display.update_all().unwrap(); 
-    
-    do_hubble( /* &mut display, */ &mut gilrs, locations );
-    return;  
-
-    let mut controller = ControllerBuilder::new()		
-        .freq(800_000)		
-        .dma(10)
-        .channel( 0, 
-            ChannelBuilder::new()
-                .pin(12)
-                .count(6)
-                .strip_type(StripType::Ws2812)
-                .brightness(50)
-                .build()
-         ).build().unwrap();
-        
-    all_on( &mut controller );
-    controller.render().unwrap();
+    let mut gilrs = Gilrs::new().unwrap();             
 
     let mut display = SSD1327::new("/dev/i2c-3");
 	display.begin().unwrap(); 
@@ -741,7 +697,24 @@ fn main() {
     let mut menu :i8 = 0;      
     let mut prev :i8 = -1;
     
-    loop {
+    //loop {
+        
+         //let value: f32 = 0.0;
+         //while let Some(event) = gilrs.next_event() {
+             //match event {
+                 //Event { id, event: EventType::ButtonPressed(Button::Select, _), .. } => {
+                     //println!("Select Pressed");
+                 //}
+                 //Event { id, event: EventType::AxisChanged(LeftStickY, value, _), .. } => {
+                     //println!("Left Stick {:?}", value);
+                 //}
+                 //_ => (),
+             //};
+         //}         
+     //}
+
+    let mut quit = false;
+    while !quit {
         
         if menu > 6 {
             menu = 0;
@@ -754,83 +727,76 @@ fn main() {
             prev = menu;
             show_menu( &mut display, menu );     
         }
-        
-        while let Some(Event { id, event, time }) = gilrs.next_event() {
-            println!("{:?} New event from {}: {:?}", time, id, event); 
-            break;              
-        }
-        
-        if ( gilrs[0].axis_data(DPadX).is_some() && gilrs[0].axis_data(DPadX).unwrap().value() == 1.0 ) || gilrs[0].is_pressed(Button::DPadRight) {                
-            menu = menu + 1;
-        }  
-        
-        if ( gilrs[0].axis_data(DPadX).is_some() && gilrs[0].axis_data(DPadX).unwrap().value() == -1.0 ) || gilrs[0].is_pressed(Button::DPadLeft) {                
-            menu = menu - 1;
-        }
-        
-        if gilrs[0].is_pressed(Button::Select) && menu == 0 {
-            display.clear(); 
-            display.draw_text(4, 4, "Canyon...", LT_GREY).unwrap();
-            display.update_all().unwrap();  
-            do_canyon( &mut display, &mut gilrs );
-            prev = -1;
-        }     
-        
-        if gilrs[0].is_pressed(Button::Select) && menu == 1 {
-            display.clear(); 
-            display.draw_text(4, 4, "Hubble...", LT_GREY).unwrap();
-            display.update_all().unwrap();  
-            do_hubble( /* &mut display, */ &mut gilrs, locations );
-            prev = -1;
-        }   
-        
-        if gilrs[0].is_pressed(Button::Select) && menu == 2 {
-            display.clear(); 
-            display.draw_text(4, 4, "Blast Off...", LT_GREY).unwrap();
-            display.update_all().unwrap();  
-            do_straight( &mut display, &mut gilrs );
-            prev = -1;
-        }
-        
-        if gilrs[0].is_pressed(Button::Select) && menu == 3 {
-            display.clear(); 
-            display.draw_text(4, 4, "Wheels RC...", LT_GREY).unwrap();
-            display.update_all().unwrap();  
-            do_wheels_rc( &mut display, &mut gilrs );
-            prev = -1;
-        }    
-        
-        if gilrs[0].is_pressed(Button::Select) && menu == 4 {
-            display.clear(); 
-            display.draw_text(4, 4, "Mecanum RC...", LT_GREY).unwrap();
-            display.update_all().unwrap();  
-            do_mecanum_rc( &mut display, &mut gilrs );
-            prev = -1;
-        }    
-        
-        if gilrs[0].is_pressed(Button::Select) && gilrs[0].is_pressed(Button::West) && menu == 5 {
-            display.clear(); 
-            display.draw_text(4, 4, "Exiting...", LT_GREY).unwrap();
-            display.update_all().unwrap();  
-            break;
-        }
-        
-        if gilrs[0].is_pressed(Button::Select) && gilrs[0].is_pressed(Button::West) && menu == 6 {
-            display.clear(); 
-            display.draw_text(4, 4, "Shutdown...", LT_GREY).unwrap();
-            display.update_all().unwrap();  
-            break;
-        }
                 
+        while let Some(event) = gilrs.next_event() {
+            match event {
+                Event { id, event: EventType::ButtonPressed(Button::DPadRight, _), .. } => {
+                    menu = menu + 1;
+                }
+                Event { id, event: EventType::ButtonPressed(Button::DPadLeft, _), .. } => {
+                    menu = menu - 1;
+                }               
+                Event { id, event: EventType::ButtonPressed(Button::Select, _), .. } => {
+                    if menu == 0 {
+                        display.clear(); 
+                        display.draw_text(4, 4, "Canyon...", LT_GREY).unwrap();
+                        display.update_all().unwrap();  
+                        do_canyon( &mut display, &mut gilrs );
+                        prev = -1;
+                    }
+                    if menu == 1 {
+                        display.clear(); 
+                        display.draw_text(4, 4, "Hubble...", LT_GREY).unwrap();
+                        display.update_all().unwrap();  
+                        do_hubble( &mut display, &mut gilrs, locations );    
+                        prev = -1;
+                    }               
+                    if menu == 2 {
+                        display.clear(); 
+                        display.draw_text(4, 4, "Blast Off...", LT_GREY).unwrap();
+                        display.update_all().unwrap();  
+                        do_straight( &mut display, &mut gilrs );
+                        prev = -1;
+                    }                
+                    if menu == 3 {
+                        display.clear(); 
+                        display.draw_text(4, 4, "Wheels RC...", LT_GREY).unwrap();
+                        display.update_all().unwrap();  
+                        do_wheels_rc( &mut display, &mut gilrs );
+                        prev = -1;
+                    }                
+                    if menu == 4 {
+                        display.clear(); 
+                        display.draw_text(4, 4, "Mecanum RC...", LT_GREY).unwrap();
+                        display.update_all().unwrap();  
+                        do_mecanum_rc( &mut display, &mut gilrs );
+                        prev = -1;
+                    }                        
+                    if menu == 5 {
+                        display.clear(); 
+                        display.draw_text(4, 4, "Exiting...", LT_GREY).unwrap();
+                        display.update_all().unwrap(); 
+                        quit = true;
+                        break;
+                    }                    
+                    if menu == 6 {
+                        display.clear(); 
+                        display.draw_text(4, 4, "Shutdown...", LT_GREY).unwrap();
+                        display.update_all().unwrap();  
+                        quit = true;
+                        break;
+                    }    
+                }               
+                _ => (),
+            };
+        }        
     }
     
     thread::sleep(time::Duration::from_millis(2000));
-    
-    all_off( &mut controller );
-    controller.render().unwrap();
-    
-    
+        
     display.clear(); 
     display.update_all().unwrap();  
     
 }
+
+

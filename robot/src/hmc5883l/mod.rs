@@ -39,7 +39,7 @@ impl HMC5883L {
 
         // start reading from register 03 (x value)
         try!(self.compass.smbus_write_byte(0x03));
-        thread::sleep(time::Duration::from_millis(100));
+        thread::sleep(time::Duration::from_millis(10));  // was 100
 
         // parse the data in the correct order - x, z, y (NOT x, y, z as you would expect)
         let x : i16 = ((buf[0] as i16) << 8) as i16 | buf[1] as i16;

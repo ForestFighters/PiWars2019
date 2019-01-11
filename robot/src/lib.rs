@@ -4,4 +4,5 @@ pub mod vl53l0x;
 pub mod servo;
 pub mod motor;
 pub mod camera;
+pub mod pixel;
 

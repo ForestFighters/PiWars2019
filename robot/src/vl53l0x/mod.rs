@@ -43,7 +43,7 @@ impl VL53L0X {
     }
 
     pub fn read(&mut self) -> Result<(u16), Box<LinuxI2CError>> {
-        let interval = time::Duration::from_millis(10);
+        let interval = time::Duration::from_millis(1); // was 10
         let mut cnt = 0;
         let _start = self.tof.smbus_write_byte_data(VL53L0X_REG_SYSRANGE_START, 0x01);
         let mut status = self.tof.smbus_read_byte_data(VL53L0X_REG_RESULT_RANGE_STATUS).unwrap();

@@ -1,7 +1,7 @@
 extern crate opencv;
 extern crate time;
 
-use std::time::Instant;
+//use std::time::Instant;
 
 use self::opencv::core;
 use self::opencv::highgui;
@@ -52,9 +52,9 @@ impl Camera {
 		return frame;
     }  
     
-    pub fn get_colour(&mut self, mut frame: core::Mat) -> Result<i32,String> {
+    pub fn get_colour(&mut self, frame: core::Mat) -> Result<i32,String> {
 	
-		let now = Instant::now();
+		//let now = Instant::now();
 		//println!("Start {:#?}",Instant::now().duration_since(now));
 	
 		let mut ret = -1;	
