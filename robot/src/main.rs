@@ -18,8 +18,17 @@ use robot::motor::*;
 use robot::ssd1327::*;
 use robot::hmc5883l::*;
 use robot::vl53l0x::*;
-
+use robot::camera::*;
 use rs_ws281x::*;
+
+enum Activities { Waiting, Searching, MoveTowards, MoveAway, Complete, Done, Finished, Test }
+
+const NONE: i32 = 0;	
+const RED: i32 = 1;	
+const BLUE: i32 = 2;
+const YELLOW: i32 = 3;
+const GREEN: i32 = 4;
+const DONE: i32 = 5;
 
 fn _test() {
         
@@ -40,6 +49,17 @@ fn _test() {
         
 }
 
+fn _test2() {
+		
+	let mut cam = build_camera( );
+	
+	while true {
+		let mat = cam.get_frame( );
+		let colour = cam.get_colour( mat );			
+	}	
+}
+	
+
 fn do_canyon( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     
     while let Some(Event { id, event, time }) = gilrs.next_event() {
@@ -50,15 +70,116 @@ fn do_canyon( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     display.clear();   
 }
 
-fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs ) {
-    
-    
-    while let Some(Event { id, event, time }) = gilrs.next_event() {
-            println!("{:?} New event from {}: {:?}", time, id, event); 
-            break;              
-        }
+
+fn inc_colour( colour: i32 ) -> i32 {
+
+	match colour {		
+		RED => {
+			println!("Found Red!");						
+			return BLUE;
+		},
+		BLUE => {
+			println!("Found Blue!");
+			return YELLOW;
+		},
+		YELLOW => {
+			println!("Found Yellow!");
+			return GREEN;
+		},
+		GREEN => {
+			println!("Found Green!");
+			return DONE;
+		},
+		_ => {
+			println!("Found Unknown");
+			return colour;
+		}	
+		
+	}					
+}
+ 
+fn do_hubble( /* display: &mut SSD1327, */ gilrs: &mut Gilrs, mut locations: [ i32; 4 ] ) {	
+		
+	let mut current = RED;
+	
+	let mut activity = Activities::Waiting;
+	
+	let mut start_Left = true;
+	let mut got_Red = false;
+	let mut got_Blue = false;
+	let mut got_Yellow = false;
+	let mut got_Green = false;
+	
+    //let left_rear_motor = build_motor( 10, 11 ); 
+    //left_rear_motor.init();
         
-    display.clear();   
+    //let right_rear_motor = build_motor( 9, 8 );
+    //right_rear_motor.init();
+    
+    //let left_front_motor = build_motor( 15, 22 );
+    //left_front_motor.init();
+
+    //let right_front_motor = build_motor( 14, 27 );
+    //right_front_motor.init();    
+    
+    //left_rear_motor.stop();    
+    //right_rear_motor.stop();
+    //left_front_motor.stop();
+    //right_front_motor.stop(); 
+	
+	let mut cam = build_camera( );
+	
+	//let mut front = VL53L0X::new( "/dev/i2c-6").unwrap();
+		
+	//display.clear(); 
+	//display.draw_text(4, 4, "Press start...", WHITE).unwrap();
+	//display.update_all().unwrap();
+
+	let mut pos = 0;
+	let mut running = false;
+    loop {
+		while let Some(Event { id, event, time }) = gilrs.next_event() {
+			println!("{:?} New event from {}: {:?}", time, id, event); 			
+			break;              
+			}
+			
+		// Start button -> running
+        if gilrs[0].is_pressed(Button::Start) {            
+			println!("Started"); 
+			//display.draw_text(4, 4, "              ", WHITE).unwrap();
+			//display.update().unwrap();
+			running = true;
+        } 
+                
+        // Triangle and cross to exit
+        if gilrs[0].is_pressed(Button::West) && gilrs[0].is_pressed(Button::South) {
+            break;
+        } 
+			
+		// action items
+		// 1) Clear Memory
+		// 2a) Searching start left
+		//		activity = Searching;
+		//		startLeft = true;
+		// 2b) Searching start right
+		//		activity = Searching;
+		//		startLeft = false;
+		
+		if running {			
+			// Found the colour we are looking for?
+			if cam.search_colour( current ) {
+				locations[pos] = current;
+				current = inc_colour( current );				
+				pos = pos + 1;
+			}
+		}
+		
+		if current == DONE {
+			break;
+		}			
+	}
+        
+    //display.clear();   
 }
 
 
@@ -578,9 +699,11 @@ fn all_off( controller: &mut Controller )
 } 
 
 fn main() {
-          
-    let mut display = SSD1327::new("/dev/i2c-3");
-    display.begin().unwrap(); 
+	
+	// A list of locations, colours are updated when found.
+	let mut locations = [ NONE, NONE, NONE, NONE ];  
+		
+    let mut gilrs = Gilrs::new().unwrap();     
     
     display.clear();
     display.draw_text(20, 42, "Forest", WHITE).unwrap();
@@ -588,23 +711,32 @@ fn main() {
     display.draw_text(20, 58, "Ready...", WHITE).unwrap();
     display.update_all().unwrap(); 
     
+    do_hubble( /* &mut display, */ &mut gilrs, locations );
+    return;  
+
     let mut controller = ControllerBuilder::new()		
-		.freq(800_000)		
-		.dma(10)
-		.channel( 0, 
-			ChannelBuilder::new()
-				.pin(12)
-				.count(6)
-				.strip_type(StripType::Ws2812)
-				.brightness(50)
-				.build()
-		 )
-		.build().unwrap();
+        .freq(800_000)		
+        .dma(10)
+        .channel( 0, 
+            ChannelBuilder::new()
+                .pin(12)
+                .count(6)
+                .strip_type(StripType::Ws2812)
+                .brightness(50)
+                .build()
+         ).build().unwrap();
         
     all_on( &mut controller );
     controller.render().unwrap();
-    
-    let mut gilrs = Gilrs::new().unwrap();
+
+    let mut display = SSD1327::new("/dev/i2c-3");
+	display.begin().unwrap(); 
+	
+	display.clear();
+	display.draw_text(20, 42, "Forest", WHITE).unwrap();
+	display.draw_text(20, 50, "Fighters", WHITE).unwrap();
+	display.draw_text(20, 58, "Ready...", WHITE).unwrap();
+	display.update_all().unwrap();   	
     
     let mut menu :i8 = 0;      
     let mut prev :i8 = -1;
@@ -648,7 +780,7 @@ fn main() {
             display.clear(); 
             display.draw_text(4, 4, "Hubble...", LT_GREY).unwrap();
             display.update_all().unwrap();  
-            do_hubble( &mut display, &mut gilrs );
+            do_hubble( /* &mut display, */ &mut gilrs, locations );
             prev = -1;
         }   
         
