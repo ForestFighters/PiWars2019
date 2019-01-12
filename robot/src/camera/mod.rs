@@ -40,19 +40,25 @@ impl Camera {
                 
     }
     
+    pub fn get_colour( &mut self ) -> i32 {
+		let mat = self.get_frame( );
+		let colour = self.what_colour( mat ).unwrap();	
+		return colour;
+	}
+    
     pub fn search_colour( &mut self, colour_to_find: i32 ) -> bool {
 		let mat = self.get_frame( );
-		let colour = self.get_colour( mat ).unwrap();	
+		let colour = self.what_colour( mat ).unwrap();	
 		return colour == colour_to_find;
 	}
     
-    pub fn get_frame( &mut self ) -> core::Mat {
+    fn get_frame( &mut self ) -> core::Mat {
         let mut frame = core::Mat::new().unwrap();
 		self.cam.read(&mut frame).unwrap();
 		return frame;
     }  
     
-    pub fn get_colour(&mut self, frame: core::Mat) -> Result<i32,String> {
+    fn what_colour(&mut self, frame: core::Mat) -> Result<i32,String> {
 	
 		//let now = Instant::now();
 		//println!("Start {:#?}",Instant::now().duration_since(now));

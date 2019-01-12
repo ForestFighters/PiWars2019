@@ -20,6 +20,13 @@ use robot::vl53l0x::*;
 use robot::camera::*;
 use robot::pixel::*;
 
+#[derive(PartialEq)]
+enum Direction  { Forwards, Backwards }  
+
+#[derive(PartialEq)]
+enum Rotation  { StartLeft, StartRight }  
+
+#[derive(PartialEq)]
 enum Activities { Waiting, Searching, MoveTowards, MoveAway, Complete, Done, Finished, Test }
 
 const NONE: i32 = 0;	
@@ -28,6 +35,9 @@ const BLUE: i32 = 2;
 const YELLOW: i32 = 3;
 const GREEN: i32 = 4;
 const DONE: i32 = 5;
+
+const TURNING_SPEED : i32 = 100;
+const DRIVING_SPEED : i32 = 200;
 
 fn _test() {
        
@@ -58,9 +68,8 @@ fn _test2() {
 		
 	let mut cam = build_camera( );
 	
-	while true {
-		let mat = cam.get_frame( );
-		let colour = cam.get_colour( mat );			
+	while true {		
+		let colour = cam.get_colour();			
 	}	
 }
 	
@@ -76,49 +85,56 @@ fn do_canyon( display: &mut SSD1327, gilrs: &mut Gilrs ) {
 }
 
 
-fn inc_colour( colour: i32 ) -> i32 {
+fn print_colour( colour: i32 ){
 
 	match colour {		
 		RED => {
 			println!("Found Red!");						
-			return BLUE;
 		},
 		BLUE => {
 			println!("Found Blue!");
-			return YELLOW;
 		},
 		YELLOW => {
 			println!("Found Yellow!");
-			return GREEN;
 		},
 		GREEN => {
 			println!("Found Green!");
-			return DONE;
 		},
 		_ => {
 			println!("Found Unknown");
-			return colour;
 		}	
 		
 	}					
+}
+
+fn drive( left_rear_motor: &Motor, right_rear_motor: &Motor, left_front_motor: &Motor, right_front_motor: &Motor, speed: i32 ) {
+    left_rear_motor.stop();    
+    right_rear_motor.stop();
+    left_front_motor.stop();
+    right_front_motor.stop();  	 
+}
+
+fn rotate( rotation: &Rotation, left_rear_motor: &Motor, right_rear_motor: &Motor, left_front_motor: &Motor, right_front_motor: &Motor, speed: i32 ) {
+    left_rear_motor.stop();    
+    right_rear_motor.stop();
+    left_front_motor.stop();
+    right_front_motor.stop();  	 
 }
  
 fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs, mut locations: [ i32; 4 ] ) {	
     
     let mut pixel = build_pixel();
+    pixel.all_on();
     
     //Use BCM numbering    
 	println!("Initialized pigpio. Version: {}", initialize().unwrap());
     
 	let mut current = RED;
 	
-	let mut activity = Activities::Waiting;
-	
-	let mut start_Left = true;
-	let mut got_Red = false;
-	let mut got_Blue = false;
-	let mut got_Yellow = false;
-	let mut got_Green = false;
+	let mut got_red = false;
+	let mut got_blue = false;
+	let mut got_yellow = false;
+	let mut got_green = false;
 	
     let left_rear_motor = build_motor( 10, 11 ); 
     left_rear_motor.init();
@@ -139,34 +155,23 @@ fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs, mut locations: [ i32; 4 
 	
 	let mut cam = build_camera( );
 	
-	//let mut front = VL53L0X::new( "/dev/i2c-6").unwrap();
+    let mut front = VL53L0X::new( "/dev/i2c-8").unwrap();
 		
-	//display.clear(); 
-	//display.draw_text(4, 4, "Press start...", WHITE).unwrap();
-	//display.update_all().unwrap();
+	display.clear(); 
+	display.draw_text(4, 4, "Press start...", WHITE).unwrap();
+	display.update_all().unwrap();
 
 	let mut pos = 0;
-	let mut running = false;
-    loop {
-		while let Some(Event { id, event, time }) = gilrs.next_event() {
-			println!("{:?} New event from {}: {:?}", time, id, event); 			
-			break;              
-			}
-			
-		// Start button -> running
-        if gilrs[0].is_pressed(Button::Start) {            
-			println!("Started"); 
-			display.draw_text(4, 4, "              ", WHITE).unwrap();
-			display.update().unwrap();
-			running = true;
-        } 
-                
-        // Triangle and cross to exit
-        if gilrs[0].is_pressed(Button::West) && gilrs[0].is_pressed(Button::South) {
-            break;
-        } 
-			
-		// action items
+	let mut running = false;    
+    let mut direction = Direction::Forwards;
+    let mut rotation = Rotation::StartLeft;
+    let mut activity = Activities::Waiting;
+    let mut colours = [ RED, BLUE, YELLOW, GREEN ];  
+    let mut current = 0;
+    
+    let mut quit = false;
+    while !quit {        
+        // action items
 		// 1) Clear Memory
 		// 2a) Searching start left
 		//		activity = Searching;
@@ -174,19 +179,132 @@ fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs, mut locations: [ i32; 4 
 		// 2b) Searching start right
 		//		activity = Searching;
 		//		startLeft = false;
-		
-		if running {			
-			// Found the colour we are looking for?
-			if cam.search_colour( current ) {
-				locations[pos] = current;
-				current = inc_colour( current );				
-				pos = pos + 1;
-			}
-		}
-		
-		if current == DONE {
-			break;
-		}			
+		while let Some(event) = gilrs.next_event() {
+            match event {
+            Event { id, event: EventType::ButtonPressed(Button::North, _), .. } => {
+                println!("North Pressed");
+                // Clear Memory
+                pixel.all_on();
+                locations = [ NONE, NONE, NONE, NONE ];                                
+                pixel.all_off();
+                activity = Activities::Waiting;
+            }
+            Event { id, event: EventType::ButtonPressed(Button::West, _), .. } => {
+                println!("West Pressed");
+                // Start button -> running                    
+                pixel.all_off();                
+                display.draw_text(4, 4, "              ", WHITE).unwrap();
+                display.update().unwrap();                
+                running = true;
+                rotation = Rotation::StartLeft;
+                activity = Activities::Searching;
+            }
+            Event { id, event: EventType::ButtonPressed(Button::East, _), .. } => {
+                println!("East Pressed");
+                // Start button -> running                    
+                pixel.all_off();                
+                display.draw_text(4, 4, "              ", WHITE).unwrap();
+                display.update().unwrap();                
+                running = true;
+                rotation = Rotation::StartRight;
+                activity = Activities::Searching;
+            }
+            Event { id, event: EventType::ButtonPressed(Button::Mode, _), .. } => {
+                println!("Mode");
+                // Mode to exit                    
+                quit = true;
+                break;                    
+            }
+            _ => (),
+            };
+        }    
+    								
+		// Main State running or not, first time through
+		if running && locations[0] == NONE {			
+			// Activity State
+			if activity == Activities::Searching  {	
+                // Get the colour and store it away
+                let colour = cam.get_colour();
+                if colour == RED && !got_red { 
+                    locations[pos] = RED;
+                    pos += 1;
+                    got_red = true;
+                }
+                if colour == BLUE && !got_blue {                                   		
+                    locations[pos] = BLUE;
+                    pos += 1;
+                    got_blue = true;
+                }
+                if colour == YELLOW && !got_yellow {      
+                    locations[pos] = YELLOW;                             		
+                    pos += 1;
+                    got_yellow = true;
+                }
+                if colour == GREEN && !got_green {                                   		
+                    locations[pos] = GREEN;
+                    pos += 1;
+                    got_green = true;
+                } 
+                
+                // Compute the last colour based on the first 3  
+                if got_red && got_blue && got_yellow && !got_green {
+                    got_green = true;
+                    locations[3] = GREEN;
+                } else if got_red && got_blue && got_green && !got_yellow {
+                    got_yellow = true;
+                    locations[3] = YELLOW;
+                } else if got_red && got_green && got_yellow && !got_blue {
+                    got_blue = true;
+                    locations[3] = BLUE;
+                } else if got_blue && got_green && got_yellow && !got_red {
+                    got_red = true;
+                    locations[3] = RED;
+                }
+                                                                    
+	            // Found the colour we are looking for?	Then increament the current colour and move on
+                if colours[current] == colour {
+                    print_colour( colour);
+                    current += 1;
+                    activity = Activities::MoveTowards;
+                } else {
+                    rotate( &rotation, &left_rear_motor, &right_rear_motor, &left_front_motor, &right_front_motor, TURNING_SPEED );
+                    activity = Activities::Searching;
+                }
+            }            
+			else if activity == Activities::MoveTowards  {	
+                // May have to check if we are square to the target?
+                if front.read().unwrap() < 130 {
+                    println!("At min distance");
+                    if colours[current] == GREEN {
+                        activity = Activities::Done;
+                    } else {
+                        activity = Activities::MoveAway;
+                    }
+                } else {
+                    drive( &left_rear_motor, &right_rear_motor, &left_front_motor, &right_front_motor, DRIVING_SPEED );
+                    activity = Activities::MoveTowards;
+                }
+            }
+            else if activity == Activities::MoveAway  {	                
+                if front.read().unwrap() > 600 {
+                    println!("At max distance");
+                    activity = Activities::MoveAway;
+                } else {
+                    drive( &left_rear_motor, &right_rear_motor, &left_front_motor, &right_front_motor, DRIVING_SPEED );
+                    activity = Activities::Complete;
+                }
+            }
+            else if activity == Activities::Complete  {	                                
+                activity = Activities::Searching;                
+            }
+            else if activity == Activities::Done  {
+                left_rear_motor.stop();    
+                right_rear_motor.stop();
+                left_front_motor.stop();
+                right_front_motor.stop();  	                                
+                break;
+            }                        
+		}            
 	}
         
     display.clear();   
@@ -697,22 +815,6 @@ fn main() {
     let mut menu :i8 = 0;      
     let mut prev :i8 = -1;
     
-    //loop {
-        
-         //let value: f32 = 0.0;
-         //while let Some(event) = gilrs.next_event() {
-             //match event {
-                 //Event { id, event: EventType::ButtonPressed(Button::Select, _), .. } => {
-                     //println!("Select Pressed");
-                 //}
-                 //Event { id, event: EventType::AxisChanged(LeftStickY, value, _), .. } => {
-                     //println!("Left Stick {:?}", value);
-                 //}
-                 //_ => (),
-             //};
-         //}         
-     //}
-
     let mut quit = false;
     while !quit {
         
