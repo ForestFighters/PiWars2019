@@ -32,8 +32,8 @@ const BLUE: i32 = 2;
 const YELLOW: i32 = 3;
 const GREEN: i32 = 4;
 
-const TURNING_SPEED : i32 = 100;
-const DRIVING_SPEED : i32 = 200;
+const TURNING_SPEED : i32 = 5000;
+const DRIVING_SPEED : i32 = 1000;
 
 fn _test() {
        
@@ -563,12 +563,12 @@ fn do_wheels_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
 
     let servo = build_servo( 21 );
 
-    let mut gear = 2;
+    let mut gear = 1;
     let mut quit = false;
-    while !quit{
+    let mut left_stick_y = 0;
+    let mut right_stick_y = 0;
         
-        let mut left_stick_y = 0;
-        let mut right_stick_y = 0;        
+    while !quit{
         //let value: f32 = 0.0;
         while let Some(event) = gilrs.next_event() {
             match event {
@@ -610,11 +610,11 @@ fn do_wheels_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
                     println!(" {0} ",gear); 
                  }
                  Event { id: _, event: EventType::AxisChanged(LeftStickY, value, _), .. } => {
-                     println!("Left Stick Y {:?}", value);
+                     //println!("Left Stick Y {:?}", value);
                      left_stick_y = (value * 1000.0) as i32;
                  }
                  Event { id: _, event: EventType::AxisChanged(RightStickY, value, _), .. } => {
-                     println!("Right Stick Y {:?}", value);
+                     //println!("Right Stick Y {:?}", value);
                      right_stick_y = (value * 1000.0) as i32;
                  }
                  _ => (),
@@ -647,7 +647,7 @@ fn do_wheels_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
         
         
         if left_rear_speed != 0 || right_rear_speed != 0 || left_front_speed != 0 || right_front_speed != 0  {
-            println!(" {0}, {1}, {2}, {3} ", left_rear_speed, right_rear_speed, left_front_speed, right_front_speed );
+            println!("Speed {0}, {1}, {2}, {3} ", left_rear_speed, right_rear_speed, left_front_speed, right_front_speed );
         }   
     
             

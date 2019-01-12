@@ -65,11 +65,11 @@ impl Camera {
 	
 		let mut ret = -1;	
 		
-		let window = "Video Capture";
-		try!(highgui::named_window(window,1));
+		//let window = "Video Capture";
+		//try!(highgui::named_window(window,1));
 		
-		let window2 = "Overlay";
-		try!(highgui::named_window(window2,1));
+		//let window2 = "Overlay";
+		//try!(highgui::named_window(window2,1));
 	    
 		//println!("Now {:#?}",Instant::now().duration_since(now));
     
@@ -139,10 +139,10 @@ impl Camera {
 			
 			let moments = result.unwrap();		
 			let area = 	moments.m00;
-			//println!("Area {:#?}",area);
+			println!("Area {:#?}",area);
 			if area > 5000f64
 			{
-				try!(highgui::imshow(window2, &mut img_final));	
+				//try!(highgui::imshow(window2, &mut img_final));	
 				if *colour == self.red || *colour == self.red2 {
 					try!(core::rectangle(&mut frame2,core::Rect{x:0,y:0,width:30,height:30},core::Scalar{ data:[0f64,0f64,255f64,-1f64] },-1 ,8 ,0));				
 					ret = self.red;	
@@ -166,7 +166,7 @@ impl Camera {
 						
 			}		
 		}
-		try!(highgui::imshow(window, &mut frame2));
+		//try!(highgui::imshow(window, &mut frame2));
 		try!(highgui::wait_key(5));
 		
 		//println!("Now {:#?}",Instant::now().duration_since(now));
@@ -186,14 +186,14 @@ pub fn build_camera( ) -> Camera {
 	let yellow = 4;
 	let colours = [ red2, red, green, blue, yellow ];
 	
-	let red2_lower = core::Scalar{ data:[0f64,158f64,158f64,-1f64] };	
-	let red2_upper = core::Scalar{ data:[10f64,255f64,255f64,-1f64] };
+	//let red2_lower = core::Scalar{ data:[0f64,158f64,158f64,-1f64] };	
+	//let red2_upper = core::Scalar{ data:[10f64,255f64,255f64,-1f64] };
 		
 	let red_lower = core::Scalar{ data:[150f64,128f64,0f64,-1f64] };	
 	let red_upper = core::Scalar{ data:[230f64,255f64,255f64,-1f64] };
 			
-	let green_lower = core::Scalar{ data:[55f64,60f64,91f64,-1f64] };	// 24 0		0
-	let green_upper = core::Scalar{ data:[96f64,192f64,255f64,-1f64] }; // 91 255	255
+	//let green_lower = core::Scalar{ data:[55f64,60f64,91f64,-1f64] };	// 24 0		0
+	//let green_upper = core::Scalar{ data:[96f64,192f64,255f64,-1f64] }; // 91 255	255
 		
 	let blue_lower = core::Scalar{ data:[75f64,127f64,127f64,-1f64] };	
 	let blue_upper = core::Scalar{ data:[107f64,255f64,255f64,-1f64] };
@@ -201,8 +201,18 @@ pub fn build_camera( ) -> Camera {
 	//let yellow_lower = core::Scalar{ data:[10f64,170f64,150f64,-1f64] };	
 	//let yellow_upper = core::Scalar{ data:[49f64,255f64,255f64,-1f64] }; 
 			
-	let yellow_lower = core::Scalar{ data:[10f64,  0f64,164f64,-1f64] };	
-	let yellow_upper = core::Scalar{ data:[48f64,140f64,255f64,-1f64] }; 
+	//let yellow_lower = core::Scalar{ data:[10f64,  0f64,164f64,-1f64] };	
+	//let yellow_upper = core::Scalar{ data:[48f64,140f64,255f64,-1f64] }; 
+	
+	let red2_lower = core::Scalar{ data:[0f64,71f64,158f64,-1f64] };	
+	let red2_upper = core::Scalar{ data:[10f64,255f64,255f64,-1f64] };
+	
+	let green_lower = core::Scalar{ data:[44f64,30f64,90f64,-1f64] };	
+	let green_upper = core::Scalar{ data:[89f64,166f64,143f64,-1f64] }; 
+	
+	let yellow_lower = core::Scalar{ data:[22f64,  0f64,209f64,-1f64] };	
+	let yellow_upper = core::Scalar{ data:[46f64,132f64,255f64,-1f64] }; 
+	
 			
     Camera {        
         cam,
