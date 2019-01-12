@@ -21,9 +21,6 @@ use robot::camera::*;
 use robot::pixel::*;
 
 #[derive(PartialEq)]
-enum Direction  { Forwards, Backwards }  
-
-#[derive(PartialEq)]
 enum Rotation  { StartLeft, StartRight }  
 
 #[derive(PartialEq)]
@@ -34,7 +31,6 @@ const RED: i32 = 1;
 const BLUE: i32 = 2;
 const YELLOW: i32 = 3;
 const GREEN: i32 = 4;
-const DONE: i32 = 5;
 
 const TURNING_SPEED : i32 = 100;
 const DRIVING_SPEED : i32 = 200;
@@ -68,8 +64,9 @@ fn _test2() {
 		
 	let mut cam = build_camera( );
 	
-	while true {		
-		let colour = cam.get_colour();			
+	loop {		
+		let colour = cam.get_colour();	
+        print_colour( colour );		
 	}	
 }
 	
@@ -107,19 +104,56 @@ fn print_colour( colour: i32 ){
 	}					
 }
 
-fn drive( left_rear_motor: &Motor, right_rear_motor: &Motor, left_front_motor: &Motor, right_front_motor: &Motor, speed: i32 ) {
-    left_rear_motor.stop();    
-    right_rear_motor.stop();
-    left_front_motor.stop();
-    right_front_motor.stop();  	 
+fn drive( left_rear_motor: &Motor, right_rear_motor: &Motor, left_front_motor: &Motor, right_front_motor: &Motor, speed: i32, gear: i32 ) {
+    
+    let mut left_front_speed  = speed;
+    let mut left_rear_speed   = speed;
+    let mut right_front_speed = speed * -1;         
+    let mut right_rear_speed  = speed * -1;
+    
+    left_front_speed  = left_front_speed / gear;
+    right_front_speed = right_front_speed / gear;
+    left_rear_speed   = left_rear_speed / gear;
+    right_rear_speed  = right_rear_speed / gear; 
+    left_rear_motor.power(left_rear_speed);
+    right_rear_motor.power(right_rear_speed);   
+    left_front_motor.power(left_front_speed);
+    right_front_motor.power(right_front_speed);     	 
 }
 
-fn rotate( rotation: &Rotation, left_rear_motor: &Motor, right_rear_motor: &Motor, left_front_motor: &Motor, right_front_motor: &Motor, speed: i32 ) {
-    left_rear_motor.stop();    
-    right_rear_motor.stop();
-    left_front_motor.stop();
-    right_front_motor.stop();  	 
+fn turn_left( left_rear_motor: &Motor, right_rear_motor: &Motor, left_front_motor: &Motor, right_front_motor: &Motor, speed: i32, gear: i32 ) {
+    let mut left_front_speed  = speed * -1;
+    let mut left_rear_speed   = speed * -1;
+    let mut right_front_speed = speed * -1;         
+    let mut right_rear_speed  = speed * -1;    
+    
+    left_front_speed  = left_front_speed / gear;
+    right_front_speed = right_front_speed / gear;
+    left_rear_speed   = left_rear_speed / gear;
+    right_rear_speed  = right_rear_speed / gear; 
+    left_rear_motor.power(left_rear_speed);
+    right_rear_motor.power(right_rear_speed);   
+    left_front_motor.power(left_front_speed);
+    right_front_motor.power(right_front_speed);    	 
 }
+
+fn turn_right( left_rear_motor: &Motor, right_rear_motor: &Motor, left_front_motor: &Motor, right_front_motor: &Motor, speed: i32, gear: i32 ) {
+    
+    let mut left_front_speed  = speed;
+    let mut left_rear_speed   = speed;
+    let mut right_front_speed = speed;         
+    let mut right_rear_speed  = speed;
+
+    left_front_speed  = left_front_speed / gear;
+    right_front_speed = right_front_speed / gear;
+    left_rear_speed   = left_rear_speed / gear;
+    right_rear_speed  = right_rear_speed / gear; 
+    left_rear_motor.power(left_rear_speed);
+    right_rear_motor.power(right_rear_speed);   
+    left_front_motor.power(left_front_speed);
+    right_front_motor.power(right_front_speed);    	 
+}
+
  
 fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs, mut locations: [ i32; 4 ] ) {	
     
@@ -129,7 +163,8 @@ fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs, mut locations: [ i32; 4 
     //Use BCM numbering    
 	println!("Initialized pigpio. Version: {}", initialize().unwrap());
     
-	let mut current = RED;
+	//let mut current = RED;
+    let colours = [ RED, BLUE, YELLOW, GREEN ];  
 	
 	let mut got_red = false;
 	let mut got_blue = false;
@@ -158,16 +193,18 @@ fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs, mut locations: [ i32; 4 
     let mut front = VL53L0X::new( "/dev/i2c-8").unwrap();
 		
 	display.clear(); 
-	display.draw_text(4, 4, "Press start...", WHITE).unwrap();
+	display.draw_text(4, 4, "Press Left(E) or Right(W)...", WHITE).unwrap();
 	display.update_all().unwrap();
 
 	let mut pos = 0;
 	let mut running = false;    
-    let mut direction = Direction::Forwards;
     let mut rotation = Rotation::StartLeft;
     let mut activity = Activities::Waiting;
-    let mut colours = [ RED, BLUE, YELLOW, GREEN ];  
+    
     let mut current = 0;
+    let mut gear = 3;
+    
+    println!("Press Left(E) or Right(W)...");
     
     let mut quit = false;
     while !quit {        
@@ -181,7 +218,7 @@ fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs, mut locations: [ i32; 4 
 		//		startLeft = false;
 		while let Some(event) = gilrs.next_event() {
             match event {
-            Event { id, event: EventType::ButtonPressed(Button::North, _), .. } => {
+            Event { id: _, event: EventType::ButtonPressed(Button::North, _), .. } => {
                 println!("North Pressed");
                 // Clear Memory
                 pixel.all_on();
@@ -189,7 +226,7 @@ fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs, mut locations: [ i32; 4 
                 pixel.all_off();
                 activity = Activities::Waiting;
             }
-            Event { id, event: EventType::ButtonPressed(Button::West, _), .. } => {
+            Event { id: _, event: EventType::ButtonPressed(Button::West, _), .. } => {
                 println!("West Pressed");
                 // Start button -> running                    
                 pixel.all_off();                
@@ -199,7 +236,7 @@ fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs, mut locations: [ i32; 4 
                 rotation = Rotation::StartLeft;
                 activity = Activities::Searching;
             }
-            Event { id, event: EventType::ButtonPressed(Button::East, _), .. } => {
+            Event { id: _, event: EventType::ButtonPressed(Button::East, _), .. } => {
                 println!("East Pressed");
                 // Start button -> running                    
                 pixel.all_off();                
@@ -209,7 +246,8 @@ fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs, mut locations: [ i32; 4 
                 rotation = Rotation::StartRight;
                 activity = Activities::Searching;
             }
-            Event { id, event: EventType::ButtonPressed(Button::Mode, _), .. } => {
+            // Needs gear changing here            
+            Event { id: _, event: EventType::ButtonPressed(Button::Mode, _), .. } => {
                 println!("Mode");
                 // Mode to exit                    
                 quit = true;
@@ -219,8 +257,8 @@ fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs, mut locations: [ i32; 4 
             };
         }    
     								
-		// Main State running or not, first time through
-		if running && locations[0] == NONE {			
+		// Main State running or not, first time through && locations[0] == NONE
+		if running {			
 			// Activity State
 			if activity == Activities::Searching  {	
                 // Get the colour and store it away
@@ -267,11 +305,14 @@ fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs, mut locations: [ i32; 4 
                     current += 1;
                     activity = Activities::MoveTowards;
                 } else {
-                    rotate( &rotation, &left_rear_motor, &right_rear_motor, &left_front_motor, &right_front_motor, TURNING_SPEED );
+                    if rotation == Rotation::StartLeft {
+                        turn_left( &left_rear_motor, &right_rear_motor, &left_front_motor, &right_front_motor, TURNING_SPEED, gear );
+                    } else {
+                        turn_right( &left_rear_motor, &right_rear_motor, &left_front_motor, &right_front_motor, TURNING_SPEED, gear );
+                    }
                     activity = Activities::Searching;
                 }
-            }            
-			else if activity == Activities::MoveTowards  {	
+            } else if activity == Activities::MoveTowards  {	
                 // May have to check if we are square to the target?
                 if front.read().unwrap() < 130 {
                     println!("At min distance");
@@ -281,29 +322,33 @@ fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs, mut locations: [ i32; 4 
                         activity = Activities::MoveAway;
                     }
                 } else {
-                    drive( &left_rear_motor, &right_rear_motor, &left_front_motor, &right_front_motor, DRIVING_SPEED );
+                    drive( &left_rear_motor, &right_rear_motor, &left_front_motor, &right_front_motor, DRIVING_SPEED, gear );
                     activity = Activities::MoveTowards;
                 }
-            }
-            else if activity == Activities::MoveAway  {	                
+            } else if activity == Activities::MoveAway  {	                
                 if front.read().unwrap() > 600 {
                     println!("At max distance");
-                    activity = Activities::MoveAway;
-                } else {
-                    drive( &left_rear_motor, &right_rear_motor, &left_front_motor, &right_front_motor, DRIVING_SPEED );
                     activity = Activities::Complete;
+                } else {
+                    drive( &left_rear_motor, &right_rear_motor, &left_front_motor, &right_front_motor, DRIVING_SPEED, gear );
+                    activity = Activities::MoveAway;
                 }
-            }
-            else if activity == Activities::Complete  {	                                
+            } else if activity == Activities::Complete  {	
+                println!("Resume searching");                                
                 activity = Activities::Searching;                
-            }
-            else if activity == Activities::Done  {
+            } else if activity == Activities::Done  {
                 left_rear_motor.stop();    
                 right_rear_motor.stop();
                 left_front_motor.stop();
                 right_front_motor.stop();  	                                
                 break;
-            }                        
+            } else if activity == Activities::Finished  {
+                // Quit
+                break;            
+            } else if activity == Activities::Test  {
+                // For testing
+                break;
+            }                
 		}            
 	}
         
@@ -363,7 +408,7 @@ fn do_straight( display: &mut SSD1327, gilrs: &mut Gilrs ) {
         
         while let Some(event) = gilrs.next_event() {
             match event {
-            Event { id, event: EventType::ButtonPressed(Button::Start, _), .. } => {
+            Event { id: _, event: EventType::ButtonPressed(Button::Start, _), .. } => {
                 println!("Select Pressed");
                 // Start button -> running                    
                 pixel.all_off();
@@ -373,12 +418,36 @@ fn do_straight( display: &mut SSD1327, gilrs: &mut Gilrs ) {
                 println!("Target {:?}", target); 
                 running = true;
             }
-            Event { id, event: EventType::ButtonPressed(Button::Mode, _), .. } => {
+            Event { id: _, event: EventType::ButtonPressed(Button::North, _), .. } => {
+                gear = 1;
+                display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
+                display.update().unwrap();  
+                println!(" {0} ",gear); 
+             }
+             Event { id: _, event: EventType::ButtonPressed(Button::West, _), .. } => {
+                gear = 2;
+                display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
+                display.update().unwrap();  
+                println!(" {0} ",gear); 
+             }
+             Event { id: _, event: EventType::ButtonPressed(Button::East, _), .. } => {
+                gear = 3;
+                display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
+                display.update().unwrap();  
+                println!(" {0} ",gear); 
+             }
+             Event { id: _, event: EventType::ButtonPressed(Button::South, _), .. } => {
+                gear = 4;
+                display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
+                display.update().unwrap();  
+                println!(" {0} ",gear); 
+             }
+            Event { id: _, event: EventType::ButtonPressed(Button::Mode, _), .. } => {
                 println!("DPad Right");
                 // Mode to exit                    
                 quit = true;
                 break;                    
-            }
+            }            
             _ => (),
             };
         }    
@@ -391,10 +460,11 @@ fn do_straight( display: &mut SSD1327, gilrs: &mut Gilrs ) {
 			
             let right_dist: i32 = right.read().unwrap() as i32;
             let left_dist: i32 = left.read().unwrap() as i32;
-                        
+                                    
+            let front_dist: i32 = front.read().unwrap() as i32;
+            println!("Front {:#?}mm, Right {:#?}mm, Left {:#?}mm ",front_dist, right_dist, left_dist);            
+            
             {
-                //let front_dist: i32 = front.read().unwrap() as i32;
-                //println!("Front {:#?}mm, Right {:#?}mm, Left {:#?}mm ",front_dist, right_dist, left_dist);            
                 //if front_dist < 400 {
                     //left_rear_motor.stop();    
                     //right_rear_motor.stop();
@@ -493,57 +563,57 @@ fn do_wheels_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
 
     let servo = build_servo( 21 );
 
-    let mut gear = 1;
+    let mut gear = 2;
     let mut quit = false;
     while !quit{
         
         let mut left_stick_y = 0;
         let mut right_stick_y = 0;        
-        let value: f32 = 0.0;
+        //let value: f32 = 0.0;
         while let Some(event) = gilrs.next_event() {
             match event {
-                 Event { id, event: EventType::ButtonPressed(Button::Mode, _), .. } => {
+                 Event { id: _, event: EventType::ButtonPressed(Button::Mode, _), .. } => {
                      println!("Mode Pressed");
                      quit = true;
                      break;
                  }
-                 Event { id, event: EventType::ButtonPressed(Button::DPadUp, _), .. } => {
+                 Event { id: _, event: EventType::ButtonPressed(Button::DPadUp, _), .. } => {
                      println!("DPad Up Pressed");
                      servo.set_pulse_width( 2500 );
                  }
-                 Event { id, event: EventType::ButtonPressed(Button::DPadDown, _), .. } => {
+                 Event { id: _, event: EventType::ButtonPressed(Button::DPadDown, _), .. } => {
                      println!("DPad Up Pressed");
                      servo.set_pulse_width( 500 );
                  }
-                 Event { id, event: EventType::ButtonPressed(Button::North, _), .. } => {
+                 Event { id: _, event: EventType::ButtonPressed(Button::North, _), .. } => {
                     gear = 1;
                     display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
                     display.update().unwrap();  
                     println!(" {0} ",gear); 
                  }
-                 Event { id, event: EventType::ButtonPressed(Button::West, _), .. } => {
+                 Event { id: _, event: EventType::ButtonPressed(Button::West, _), .. } => {
                     gear = 2;
                     display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
                     display.update().unwrap();  
                     println!(" {0} ",gear); 
                  }
-                 Event { id, event: EventType::ButtonPressed(Button::East, _), .. } => {
+                 Event { id: _, event: EventType::ButtonPressed(Button::East, _), .. } => {
                     gear = 3;
                     display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
                     display.update().unwrap();  
                     println!(" {0} ",gear); 
                  }
-                 Event { id, event: EventType::ButtonPressed(Button::South, _), .. } => {
+                 Event { id: _, event: EventType::ButtonPressed(Button::South, _), .. } => {
                     gear = 4;
                     display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
                     display.update().unwrap();  
                     println!(" {0} ",gear); 
                  }
-                 Event { id, event: EventType::AxisChanged(LeftStickY, value, _), .. } => {
+                 Event { id: _, event: EventType::AxisChanged(LeftStickY, value, _), .. } => {
                      println!("Left Stick Y {:?}", value);
                      left_stick_y = (value * 1000.0) as i32;
                  }
-                 Event { id, event: EventType::AxisChanged(RightStickY, value, _), .. } => {
+                 Event { id: _, event: EventType::AxisChanged(RightStickY, value, _), .. } => {
                      println!("Right Stick Y {:?}", value);
                      right_stick_y = (value * 1000.0) as i32;
                  }
@@ -799,7 +869,7 @@ fn show_menu( display: &mut SSD1327, menu: i8) {display.clear();
 fn main() {
 
 	// A list of locations, colours are updated when found.
-	let mut locations = [ NONE, NONE, NONE, NONE ];  
+	let locations = [ NONE, NONE, NONE, NONE ];  
 		
     let mut gilrs = Gilrs::new().unwrap();             
 
@@ -832,13 +902,13 @@ fn main() {
                 
         while let Some(event) = gilrs.next_event() {
             match event {
-                Event { id, event: EventType::ButtonPressed(Button::DPadRight, _), .. } => {
+                Event { id: _, event: EventType::ButtonPressed(Button::DPadRight, _), .. } => {
                     menu = menu + 1;
                 }
-                Event { id, event: EventType::ButtonPressed(Button::DPadLeft, _), .. } => {
+                Event { id: _, event: EventType::ButtonPressed(Button::DPadLeft, _), .. } => {
                     menu = menu - 1;
                 }               
-                Event { id, event: EventType::ButtonPressed(Button::Select, _), .. } => {
+                Event { id: _, event: EventType::ButtonPressed(Button::Select, _), .. } => {
                     if menu == 0 {
                         display.clear(); 
                         display.draw_text(4, 4, "Canyon...", LT_GREY).unwrap();
