@@ -11,8 +11,8 @@ pub struct Camera {
 	
     pub cam: highgui::VideoCapture,
     
-    pub red2_lower: core::Scalar,
-	pub red2_upper: core::Scalar,
+    //pub red2_lower: core::Scalar,
+	//pub red2_upper: core::Scalar,
 	
 	pub red_lower: core::Scalar,
 	pub red_upper: core::Scalar,
@@ -26,12 +26,12 @@ pub struct Camera {
 	pub yellow_lower: core::Scalar,
 	pub yellow_upper: core::Scalar,
 	
-	pub red2: i32,
+	//pub red2: i32,
 	pub red: i32,
 	pub green: i32,
 	pub blue: i32,
 	pub yellow: i32,
-	pub colours: [ i32; 5], 
+	pub colours: [ i32; 4], 
 }
 
 impl Camera {   
@@ -40,15 +40,15 @@ impl Camera {
                 
     }
     
-    pub fn get_colour( &mut self ) -> i32 {
+    pub fn get_colour( &mut self, visible: bool ) -> i32 {
 		let mat = self.get_frame( );
-		let colour = self.what_colour( mat ).unwrap();	
+		let colour = self.what_colour( mat, visible ).unwrap();	
 		return colour;
 	}
     
-    pub fn search_colour( &mut self, colour_to_find: i32 ) -> bool {
+    pub fn search_colour( &mut self, colour_to_find: i32, visible: bool ) -> bool {
 		let mat = self.get_frame( );
-		let colour = self.what_colour( mat ).unwrap();	
+		let colour = self.what_colour( mat, false ).unwrap();	
 		return colour == colour_to_find;
 	}
     
@@ -58,18 +58,22 @@ impl Camera {
 		return frame;
     }  
     
-    fn what_colour(&mut self, frame: core::Mat) -> Result<i32,String> {
+    fn what_colour(&mut self, frame: core::Mat, visible: bool) -> Result<i32,String> {
 	
 		//let now = Instant::now();
 		//println!("Start {:#?}",Instant::now().duration_since(now));
 	
 		let mut ret = -1;	
 		
-		//let window = "Video Capture";
-		//try!(highgui::named_window(window,1));
+		let window = "Video Capture";
+		if visible {
+			try!(highgui::named_window(window,1));
+		}
 		
-		//let window2 = "Overlay";
-		//try!(highgui::named_window(window2,1));
+		let window2 = "Overlay";
+		if visible {
+			try!(highgui::named_window(window2,1));
+		}
 	    
 		//println!("Now {:#?}",Instant::now().duration_since(now));
     
@@ -84,7 +88,8 @@ impl Camera {
 		let mut frame2 = try!(core::Mat::rect( &frame, core::Rect{x:0,y:200,width:640,height:80}) );
 						
 		let mut img_hsv = try!(core::Mat::new());
-		try!(imgproc::cvt_color(&mut frame2, &mut img_hsv, imgproc::COLOR_BGR2HSV, 0));
+		//try!(imgproc::cvt_color(&mut frame2, &mut img_hsv, imgproc::COLOR_BGR2HSV, 0));
+		try!(imgproc::cvt_color(&mut frame2, &mut img_hsv, imgproc::COLOR_BGR2YUV, 0));
 		
 		let mut img_thresholded = try!(core::Mat::new());
 		
@@ -92,12 +97,7 @@ impl Camera {
 		
 		for colour in self.colours.iter()
 		{
-			let mut _img_final = try!(core::Mat::new());  
-			if *colour == self.red2 {
-				let img_lower = try!(core::Mat::new_size_with_default( try!(img_hsv.size()), try!(img_hsv.typ()), self.red2_lower ));
-				let img_upper = try!(core::Mat::new_size_with_default( try!(img_hsv.size()), try!(img_hsv.typ()), self.red2_upper ));
-				try!(core::in_range( &mut img_hsv, &img_lower, &img_upper, &mut img_thresholded));      
-			}
+			let mut _img_final = try!(core::Mat::new());  			
 			if *colour == self.red {
 				let img_lower = try!(core::Mat::new_size_with_default( try!(img_hsv.size()), try!(img_hsv.typ()), self.red_lower ));
 				let img_upper = try!(core::Mat::new_size_with_default( try!(img_hsv.size()), try!(img_hsv.typ()), self.red_upper ));
@@ -137,13 +137,17 @@ impl Camera {
 			let result = imgproc::moments(&mut img_final, false);
 			assert!( result.is_ok() );
 			
+			if visible {
+					try!(highgui::imshow(window2, &mut img_final));	
+			}
+			
 			let moments = result.unwrap();		
 			let area = 	moments.m00;
-			println!("Area {:#?}",area);
+						
+			//println!("Area {:#?}",area);
 			if area > 5000f64
-			{
-				//try!(highgui::imshow(window2, &mut img_final));	
-				if *colour == self.red || *colour == self.red2 {
+			{				
+				if *colour == self.red {
 					try!(core::rectangle(&mut frame2,core::Rect{x:0,y:0,width:30,height:30},core::Scalar{ data:[0f64,0f64,255f64,-1f64] },-1 ,8 ,0));				
 					ret = self.red;	
 					break;						
@@ -162,11 +166,12 @@ impl Camera {
 					try!(core::rectangle(&mut frame2,core::Rect{x:0,y:0,width:30,height:30},core::Scalar{ data:[0f64,255f64,255f64,-1f64] },-1 ,8 ,0));				
 					ret = self.yellow;
 					break;
-				}
-						
+				}						
 			}		
 		}
-		//try!(highgui::imshow(window, &mut frame2));
+		if visible {
+			try!(highgui::imshow(window, &mut frame2));
+		}
 		try!(highgui::wait_key(5));
 		
 		//println!("Now {:#?}",Instant::now().duration_since(now));
@@ -179,45 +184,26 @@ impl Camera {
 pub fn build_camera( ) -> Camera {
 		
 	let cam = highgui::VideoCapture::device(0).unwrap(); 		
-	let red2 = 0;
-	let red = 1;
-	let green = 2;
-	let blue = 3;
-	let yellow = 4;
-	let colours = [ red2, red, green, blue, yellow ];
-	
-	//let red2_lower = core::Scalar{ data:[0f64,158f64,158f64,-1f64] };	
-	//let red2_upper = core::Scalar{ data:[10f64,255f64,255f64,-1f64] };
+	let red = 0;
+	let blue = 1;
+	let yellow = 2;
+	let green = 3;		
+	let colours = [ red, blue, yellow, green ];
 		
-	let red_lower = core::Scalar{ data:[150f64,128f64,0f64,-1f64] };	
-	let red_upper = core::Scalar{ data:[230f64,255f64,255f64,-1f64] };
+	let red_lower = core::Scalar{ data:[ 58f64,  167f64, 107f64,-1f64] };	
+	let red_upper = core::Scalar{ data:[ 98f64,  207f64, 147f64,-1f64] };
+	
+	let blue_lower = core::Scalar{ data:[ 49f64,  80f64, 180f64,-1f64] };	
+	let blue_upper = core::Scalar{ data:[ 89f64, 120f64, 220f64,-1f64] };
+	
+	let yellow_lower = core::Scalar{ data:[121f64,142f64, 68f64,-1f64] };	
+	let yellow_upper = core::Scalar{ data:[161f64,182f64,108f64,-1f64] }; 
 			
-	//let green_lower = core::Scalar{ data:[55f64,60f64,91f64,-1f64] };	// 24 0		0
-	//let green_upper = core::Scalar{ data:[96f64,192f64,255f64,-1f64] }; // 91 255	255
-		
-	let blue_lower = core::Scalar{ data:[75f64,127f64,127f64,-1f64] };	
-	let blue_upper = core::Scalar{ data:[107f64,255f64,255f64,-1f64] };
-	
-	//let yellow_lower = core::Scalar{ data:[10f64,170f64,150f64,-1f64] };	
-	//let yellow_upper = core::Scalar{ data:[49f64,255f64,255f64,-1f64] }; 
-			
-	//let yellow_lower = core::Scalar{ data:[10f64,  0f64,164f64,-1f64] };	
-	//let yellow_upper = core::Scalar{ data:[48f64,140f64,255f64,-1f64] }; 
-	
-	let red2_lower = core::Scalar{ data:[0f64,71f64,158f64,-1f64] };	
-	let red2_upper = core::Scalar{ data:[10f64,255f64,255f64,-1f64] };
-	
-	let green_lower = core::Scalar{ data:[44f64,30f64,90f64,-1f64] };	
-	let green_upper = core::Scalar{ data:[89f64,166f64,143f64,-1f64] }; 
-	
-	let yellow_lower = core::Scalar{ data:[22f64,  0f64,209f64,-1f64] };	
-	let yellow_upper = core::Scalar{ data:[46f64,132f64,255f64,-1f64] }; 
-	
+	let green_lower = core::Scalar{ data:[124f64, 71f64,  83f64,-1f64] };	
+	let green_upper = core::Scalar{ data:[164f64,111f64, 123f64,-1f64] }; 	
 			
     Camera {        
         cam,
-        red2_lower,
-		red2_upper,	
 		red_lower,
 		red_upper,		
 		green_lower,
@@ -226,7 +212,6 @@ pub fn build_camera( ) -> Camera {
 		blue_upper,		
 		yellow_lower,
 		yellow_upper,
-        red2,
 		red,
 		green,
 		blue,

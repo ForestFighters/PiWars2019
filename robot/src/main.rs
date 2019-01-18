@@ -26,14 +26,14 @@ enum Rotation  { StartLeft, StartRight }
 #[derive(PartialEq)]
 enum Activities { Waiting, Searching, MoveTowards, MoveAway, Complete, Done, Finished, Test }
 
-const NONE: i32 = 0;	
-const RED: i32 = 1;	
-const BLUE: i32 = 2;
-const YELLOW: i32 = 3;
-const GREEN: i32 = 4;
+const NONE: i32 = -1;
+const RED: i32 = 0;	
+const BLUE: i32 = 1;
+const YELLOW: i32 = 2;
+const GREEN: i32 = 3;
 
-const TURNING_SPEED : i32 = 5000;
-const DRIVING_SPEED : i32 = 1000;
+const TURNING_SPEED : i32 = 700;
+const DRIVING_SPEED : i32 = 600;
 
 fn _test() {
        
@@ -65,7 +65,7 @@ fn _test2() {
 	let mut cam = build_camera( );
 	
 	loop {		
-		let colour = cam.get_colour();	
+		let colour = cam.get_colour(true);	
         print_colour( colour );		
 	}	
 }
@@ -262,23 +262,27 @@ fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs, mut locations: [ i32; 4 
 			// Activity State
 			if activity == Activities::Searching  {	
                 // Get the colour and store it away
-                let colour = cam.get_colour();
+                let colour = cam.get_colour(false);
                 if colour == RED && !got_red { 
+                    print_colour( colour);
                     locations[pos] = RED;
                     pos += 1;
-                    got_red = true;
+                    got_red = true;                    
                 }
-                if colour == BLUE && !got_blue {                                   		
+                if colour == BLUE && !got_blue {     
+                    print_colour( colour);                              		
                     locations[pos] = BLUE;
                     pos += 1;
                     got_blue = true;
                 }
                 if colour == YELLOW && !got_yellow {      
-                    locations[pos] = YELLOW;                             		
+                    locations[pos] = YELLOW;      
+                    print_colour( colour);                       		
                     pos += 1;
                     got_yellow = true;
                 }
-                if colour == GREEN && !got_green {                                   		
+                if colour == GREEN && !got_green {  
+                    print_colour( colour);                                 		
                     locations[pos] = GREEN;
                     pos += 1;
                     got_green = true;
@@ -288,33 +292,40 @@ fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs, mut locations: [ i32; 4 
                 if got_red && got_blue && got_yellow && !got_green {
                     got_green = true;
                     locations[3] = GREEN;
+                    activity = Activities::Finished;
                 } else if got_red && got_blue && got_green && !got_yellow {
                     got_yellow = true;
                     locations[3] = YELLOW;
+                    activity = Activities::Finished;
                 } else if got_red && got_green && got_yellow && !got_blue {
                     got_blue = true;
                     locations[3] = BLUE;
+                    activity = Activities::Finished;
                 } else if got_blue && got_green && got_yellow && !got_red {
                     got_red = true;
                     locations[3] = RED;
+                    activity = Activities::Finished;
                 }
                                                                     
 	            // Found the colour we are looking for?	Then increament the current colour and move on
-                if colours[current] == colour {
-                    print_colour( colour);
-                    current += 1;
-                    activity = Activities::MoveTowards;
-                } else {
+                //if colours[current] == colour {
+                    //println!("Current = {:?}", current);
+                    //print_colour( colour);
+                    //current += 1;
+                    //activity = Activities::MoveTowards;
+                //} else {
                     if rotation == Rotation::StartLeft {
                         turn_left( &left_rear_motor, &right_rear_motor, &left_front_motor, &right_front_motor, TURNING_SPEED, gear );
                     } else {
                         turn_right( &left_rear_motor, &right_rear_motor, &left_front_motor, &right_front_motor, TURNING_SPEED, gear );
                     }
                     activity = Activities::Searching;
-                }
+                //}
             } else if activity == Activities::MoveTowards  {	
                 // May have to check if we are square to the target?
-                if front.read().unwrap() < 130 {
+                let dist = front.read().unwrap();
+                println!("Distance = {:?}", dist);
+                if dist < 130 {
                     println!("At min distance");
                     if colours[current] == GREEN {
                         activity = Activities::Done;
@@ -325,8 +336,10 @@ fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs, mut locations: [ i32; 4 
                     drive( &left_rear_motor, &right_rear_motor, &left_front_motor, &right_front_motor, DRIVING_SPEED, gear );
                     activity = Activities::MoveTowards;
                 }
-            } else if activity == Activities::MoveAway  {	                
-                if front.read().unwrap() > 600 {
+            } else if activity == Activities::MoveAway  {	
+                let dist = front.read().unwrap();
+                println!("Distance = {:?}", dist);                
+                if dist > 600 {
                     println!("At max distance");
                     activity = Activities::Complete;
                 } else {
@@ -344,6 +357,7 @@ fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs, mut locations: [ i32; 4 
                 break;
             } else if activity == Activities::Finished  {
                 // Quit
+                quit = true;
                 break;            
             } else if activity == Activities::Test  {
                 // For testing
@@ -672,132 +686,145 @@ fn do_mecanum_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     println!("Initialized pigpio. Version: {}", initialize().unwrap());
     let interval = time::Duration::from_millis(2000);
 
-    //Use BCM numbering
-    let left_rear_motor = build_motor( 17, 27);
+    //Use BCM numbering 
+    // Channel 4
+    let left_rear_motor = build_motor( 10, 11 ); 
     left_rear_motor.init();
         
-    let right_rear_motor = build_motor( 25, 23);
+    // Channel 3
+    let right_rear_motor = build_motor( 9, 8 );
     right_rear_motor.init();
-    
-    let left_front_motor = build_motor( 10, 11);
+
+    // Channel 2
+    let left_front_motor = build_motor( 15, 22 );
     left_front_motor.init();
-    
-    let right_front_motor = build_motor( 12, 8);
-    right_front_motor.init();
+
+    // Channel 1
+    let right_front_motor = build_motor( 14, 27 );
+    right_front_motor.init();    
     
     let servo = build_servo( 21 );        
         
-    let mut gear = 1;
+    let mut gear = 2;
+    let mut left_stick_x = 0;
+    let mut left_stick_y = 0;
+    let mut right_stick_y = 0;
+    let mut right_stick_x = 0;
     
-    loop {
-        while let Some(Event { id, event, time }) = gilrs.next_event() {
-            println!("{:?} New event from {}: {:?}", time, id, event); 
-            break;              
-        }
-                    
-        let mut left_stick_x = 0;
-        let mut left_stick_y = 0;
-        let mut right_stick_y = 0;
-        let mut right_stick_x = 0;
-        
-        let mut dpad = 0;
-                
-        if gilrs[0].axis_data(LeftStickY).is_some() {               
-            left_stick_y = (gilrs[0].axis_data(LeftStickY).unwrap().value() * 1000.0) as i32;
-        }
-        
-        if gilrs[0].axis_data(LeftStickX).is_some() {               
-            left_stick_x = (gilrs[0].axis_data(LeftStickX).unwrap().value() * 1000.0) as i32;
-        }
-        
-        if gilrs[0].axis_data(RightZ).is_some() {               
-            right_stick_y = (gilrs[0].axis_data(RightZ).unwrap().value() * -1000.0) as i32;
-        }
-        
-        if gilrs[0].axis_data(LeftZ).is_some() {                
-            right_stick_x = (gilrs[0].axis_data(LeftZ).unwrap().value() * 1000.0) as i32;   
-        }   
-        
-        if gilrs[0].axis_data(DPadY).is_some() {                
-            dpad = (gilrs[0].axis_data(DPadY).unwrap().value()) as i32;
-        }   
-                
-        
-        if gilrs[0].is_pressed(Button::North) {
-            gear = 1;
-            display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
-            display.update().unwrap();  
-            println!(" {0} ",gear);         
-        }
-        
-        if gilrs[0].is_pressed(Button::West) {
-            gear = 2;
-            display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
-            display.update().unwrap();  
-            println!(" {0} ",gear);         
-        }
-        
-        if gilrs[0].is_pressed(Button::East) {
-            gear = 3;           
-            display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
-            display.update().unwrap();  
-            println!(" {0} ",gear);
-        }
-        
-        if gilrs[0].is_pressed(Button::South) {
-            gear = 4;           display.clear(); 
-            display.draw_text(4, 4, "Canyon...", LT_GREY).unwrap();
-            display.update_all().unwrap();
-            display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
-            display.update().unwrap();  
-            println!(" {0} ",gear);
-        }
-                    
-        if gilrs[0].is_pressed(Button::Mode) {
-            break;
-        }
-                
-        
-        let mut left_rear_speed: i32;
-        let mut right_rear_speed: i32;
-        let mut left_front_speed: i32;
-        let mut right_front_speed: i32;
-                
-        if left_stick_y == 0 && left_stick_x == 0 {             
-            left_rear_speed = 0;
-            right_rear_speed = 0;
-            left_front_speed = 0;
-            right_front_speed = 0;
-        }
-        else
-        {           
-            left_front_speed  = -left_stick_x + left_stick_y - right_stick_x;               
-            left_rear_speed   = left_stick_x + left_stick_y - right_stick_x;
+    let mut dpad = 0;
+    let mut quit = false;
+    while !quit { 
+        //let value: f32 = 0.0;
+        while let Some(event) = gilrs.next_event() {
+            match event {
+                 Event { id: _, event: EventType::ButtonPressed(Button::Mode, _), .. } => {
+                     println!("Mode Pressed");
+                     quit = true;
+                     break;
+                 }
+                 Event { id: _, event: EventType::ButtonPressed(Button::DPadUp, _), .. } => {
+                     println!("DPad Up Pressed");
+                     servo.set_pulse_width( 2500 );
+                 }
+                 Event { id: _, event: EventType::ButtonPressed(Button::DPadDown, _), .. } => {
+                     println!("DPad Up Pressed");
+                     servo.set_pulse_width( 500 );
+                 }
+                 Event { id: _, event: EventType::ButtonPressed(Button::North, _), .. } => {
+                    gear = 1;
+                    display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
+                    display.update().unwrap();  
+                    println!(" {0} ",gear); 
+                 }
+                 Event { id: _, event: EventType::ButtonPressed(Button::West, _), .. } => {
+                    gear = 2;
+                    display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
+                    display.update().unwrap();  
+                    println!(" {0} ",gear); 
+                 }
+                 Event { id: _, event: EventType::ButtonPressed(Button::East, _), .. } => {
+                    gear = 3;
+                    display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
+                    display.update().unwrap();  
+                    println!(" {0} ",gear); 
+                 }
+                 Event { id: _, event: EventType::ButtonPressed(Button::South, _), .. } => {
+                    gear = 4;
+                    display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
+                    display.update().unwrap();  
+                    println!(" {0} ",gear); 
+                 }
+                 Event { id: _, event: EventType::AxisChanged(LeftStickY, value, _), .. } => {
+                     //println!("Left Stick Y {:?}", value);
+                     left_stick_y = (value * 1000.0) as i32;
+                 }
+                 Event { id: _, event: EventType::AxisChanged(LeftStickX, value, _), .. } => {
+                     //println!("Left Stick X {:?}", value);
+                     left_stick_x = (value * 1000.0) as i32;
+                 }
+                 Event { id: _, event: EventType::AxisChanged(RightStickY, value, _), .. } => {
+                     //println!("Right Stick Y {:?}", value);
+                     right_stick_y = (value * 1000.0) as i32;
+                 }
+                 Event { id: _, event: EventType::AxisChanged(RightStickX, value, _), .. } => {
+                     //println!("Right Stick X {:?}", value);
+                     right_stick_x = (value * 1000.0) as i32;
+                 }
+                 _ => (),
+             };
             
-            right_rear_speed  = -left_stick_x - left_stick_y + right_stick_x;
-            right_front_speed = left_stick_x - left_stick_y + right_stick_x;
+            let mut left_rear_speed: i32;
+            let mut right_rear_speed: i32;
+            let mut left_front_speed: i32;
+            let mut right_front_speed: i32;
+                    
+            if left_stick_y == 0 && right_stick_y == 0 {             
+                left_rear_speed = 0;
+                right_rear_speed = 0;
+                left_front_speed = 0;
+                right_front_speed = 0;
+            }
+            else
+            {           
+                //left_front_speed  = -left_stick_x + left_stick_y - right_stick_x;               
+                //left_rear_speed   = left_stick_x + left_stick_y - right_stick_x;                
+                //right_rear_speed  = -left_stick_x - left_stick_y + right_stick_x;
+                //right_front_speed = left_stick_x - left_stick_y + right_stick_x;
+                if left_stick_x < 10 && left_stick_x > -10 { 
+                    left_front_speed  = left_stick_y;
+                    left_rear_speed   = left_stick_y;
+                    right_front_speed = -right_stick_y;         
+                    right_rear_speed  = -right_stick_y;
+                } else {
+                    left_front_speed  = left_stick_y - right_stick_x;               
+                    left_rear_speed   = left_stick_y - right_stick_x;                
+                    right_rear_speed  = left_stick_y + right_stick_x;
+                    right_front_speed = left_stick_y + right_stick_x;
+                } 
+            }
+            
+            
+            left_front_speed  = left_front_speed / gear;
+            right_front_speed = right_front_speed / gear;
+            left_rear_speed   = left_rear_speed / gear;
+            right_rear_speed  = right_rear_speed / gear;        
+            
+            if left_rear_speed != 0 || right_rear_speed != 0 || left_front_speed != 0 || right_front_speed != 0  {
+                println!(" {0}, {1}, {2}, {3} ", left_rear_speed, right_rear_speed, left_front_speed, right_front_speed );
+            }   
+            
+            left_rear_motor.power(left_rear_speed);
+            right_rear_motor.power(right_rear_speed);   
+            left_front_motor.power(left_front_speed);
+            right_front_motor.power(right_front_speed); 
+            
+            if dpad == 1 {
+                servo.set_pulse_width( 2500 );
+            }
+            else if dpad == -1 {
+                servo.set_pulse_width( 500 );
+            }
         }
-        
-        if dpad == 1 {
-            servo.set_pulse_width( 2500 );
-        }
-        else if dpad == -1 {
-            servo.set_pulse_width( 500 );
-        }
-        
-        left_front_speed  = left_front_speed / gear;
-        right_front_speed = right_front_speed / gear;
-        left_rear_speed   = left_rear_speed / gear;
-        right_rear_speed  = right_rear_speed / gear;        
-        
-        if left_rear_speed != 0 || right_rear_speed != 0 || left_front_speed != 0 || right_front_speed != 0  {
-            println!(" {0}, {1}, {2}, {3} ", left_rear_speed, right_rear_speed, left_front_speed, right_front_speed );
-        }   
-        
-        left_rear_motor.power(left_rear_speed);
-        right_rear_motor.power(right_rear_speed);   
-        left_front_motor.power(left_front_speed);
-        right_front_motor.power(right_front_speed); 
             
     }
     
@@ -867,6 +894,11 @@ fn show_menu( display: &mut SSD1327, menu: i8) {display.clear();
 }
 
 fn main() {
+    
+    // Uncomment to test
+    //_test();    
+    //_test2();    
+    //return;
 
 	// A list of locations, colours are updated when found.
 	let locations = [ NONE, NONE, NONE, NONE ];  
