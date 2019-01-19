@@ -778,14 +778,13 @@ fn do_mecanum_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
             let mut left_front_speed: i32;
             let mut right_front_speed: i32;
                     
-            if left_stick_y == 0 && right_stick_y == 0 {             
-                left_rear_speed = 0;
-                right_rear_speed = 0;
-                left_front_speed = 0;
-                right_front_speed = 0;
-            }
-            else
-            {           
+                        
+            left_rear_speed = 0;
+            right_rear_speed = 0;
+            left_front_speed = 0;
+            right_front_speed = 0;
+            
+            if left_stick_y != 0 && right_stick_y != 0 {           
                 //left_front_speed  = -left_stick_x + left_stick_y - right_stick_x;               
                 //left_rear_speed   = left_stick_x + left_stick_y - right_stick_x;                
                 //right_rear_speed  = -left_stick_x - left_stick_y + right_stick_x;
@@ -795,29 +794,33 @@ fn do_mecanum_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
                     left_rear_speed   = left_stick_y;
                     right_front_speed = -right_stick_y;         
                     right_rear_speed  = -right_stick_y;
-                } else if (left_stick_x > 10 || left_stick_x < -10) && (left_stick_y < 10 && left_stick_y < -10) && (right_stick_y < 10 && right_stick_y < -10) {
-                    // go sideways - 
-                    // left = front forward, back backwards
-                    // right = front backward, back forwards
-                    if left_stick_x > 10 {
-                        // right
-                        left_front_speed = -left_stick_x;
-                        right_front_speed = -left_stick_x;
-                        left_back_speed = left_stick_x;
-                        right_back_speed = left_stick_x;
-                    } elif left_stick_x < 0 {
-                        // left
-                        left_front_speed = left_stick_x;
-                        right_front_speed = left_stick_x;
-                        left_back_speed = -left_stick_x;
-                        right_back_speed = -left_stick_x;
-                    }
-                } else {
+                } 
+                else {
                     left_front_speed  = left_stick_y - right_stick_x;               
                     left_rear_speed   = left_stick_y - right_stick_x;                
                     right_rear_speed  = left_stick_y + right_stick_x;
                     right_front_speed = left_stick_y + right_stick_x;
                 } 
+            } 
+            if (left_stick_x > 10 || left_stick_x < -10) && (left_stick_y < 10 && left_stick_y > -10) && (right_stick_y < 10 && right_stick_y > -10) {
+                // go sideways - 
+                // left = front forward, rear backwards
+                // right = front backward, rear forwards
+                println!("left-x - {0}, left-y - {1}", left_stick_x, left_stick_y);
+                // right
+                if left_stick_x > 0 {
+                    println!("going right");
+                } else {
+                    println!("going left");
+                }
+                // if x > 0, front will be negative, rear will be positive - right
+                // if x < 0, front will be positive, rear will be negative - left
+                // however, right is flipped round!
+                left_front_speed = -left_stick_x;
+                right_front_speed = left_stick_x;
+                left_rear_speed = left_stick_x;
+                right_rear_speed = -left_stick_x;
+                println!("left front: {0}, left back: {1}, right front: {2} right back: {3}", left_front_speed, left_rear_speed, right_front_speed, left_rear_speed);
             }
             
             
@@ -829,10 +832,13 @@ fn do_mecanum_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
             if left_rear_speed != 0 || right_rear_speed != 0 || left_front_speed != 0 || right_front_speed != 0  {
                 println!(" {0}, {1}, {2}, {3} ", left_rear_speed, right_rear_speed, left_front_speed, right_front_speed );
             }   
-            
+            println!("running left rear");
             left_rear_motor.power(left_rear_speed);
-            right_rear_motor.power(right_rear_speed);   
+            println!("running right rear");
+            right_rear_motor.power(right_rear_speed);  
+            println!("running left front"); 
             left_front_motor.power(left_front_speed);
+            println!("running right front"); 
             right_front_motor.power(right_front_speed); 
             
             if dpad == 1 {
