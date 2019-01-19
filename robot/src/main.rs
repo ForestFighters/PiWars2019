@@ -806,7 +806,6 @@ fn do_mecanum_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
                 // go sideways - 
                 // left = front forward, rear backwards
                 // right = front backward, rear forwards
-                println!("left-x - {0}, left-y - {1}", left_stick_x, left_stick_y);
                 // right
                 if left_stick_x > 0 {
                     println!("going right");
@@ -820,7 +819,6 @@ fn do_mecanum_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
                 right_front_speed = left_stick_x;
                 left_rear_speed = left_stick_x;
                 right_rear_speed = -left_stick_x;
-                println!("left front: {0}, left back: {1}, right front: {2} right back: {3}", left_front_speed, left_rear_speed, right_front_speed, left_rear_speed);
             }
             
             
@@ -830,15 +828,11 @@ fn do_mecanum_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
             right_rear_speed  = right_rear_speed / gear;        
             
             if left_rear_speed != 0 || right_rear_speed != 0 || left_front_speed != 0 || right_front_speed != 0  {
-                println!(" {0}, {1}, {2}, {3} ", left_rear_speed, right_rear_speed, left_front_speed, right_front_speed );
+                println!("left rear: {0}, right rear: {1}, left front: {2} right front: {3}", left_rear_speed, right_rear_speed, left_front_speed, right_front_speed );
             }   
-            println!("running left rear");
             left_rear_motor.power(left_rear_speed);
-            println!("running right rear");
             right_rear_motor.power(right_rear_speed);  
-            println!("running left front"); 
             left_front_motor.power(left_front_speed);
-            println!("running right front"); 
             right_front_motor.power(right_front_speed); 
             
             if dpad == 1 {
