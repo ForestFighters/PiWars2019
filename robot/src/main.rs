@@ -801,16 +801,16 @@ fn do_mecanum_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
                     // right = front backward, back forwards
                     if left_stick_x > 10 {
                         // right
-                        left_front_speed = -left_stick_y;
-                        right_front_speed = -left_stick_y;
-                        left_back_speed = left_stick_y;
-                        right_back_speed = left_stick_y;
+                        left_front_speed = -left_stick_x;
+                        right_front_speed = -left_stick_x;
+                        left_back_speed = left_stick_x;
+                        right_back_speed = left_stick_x;
                     } elif left_stick_x < 0 {
                         // left
-                        left_front_speed = left_stick_y;
-                        right_front_speed = left_stick_y;
-                        left_back_speed = -left_stick_y;
-                        right_back_speed = -left_stick_y;
+                        left_front_speed = left_stick_x;
+                        right_front_speed = left_stick_x;
+                        left_back_speed = -left_stick_x;
+                        right_back_speed = -left_stick_x;
                     }
                 } else {
                     left_front_speed  = left_stick_y - right_stick_x;               
