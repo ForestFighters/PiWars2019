@@ -69,7 +69,31 @@ fn _test2() {
         print_colour( colour );		
 	}	
 }
-	
+
+fn _test3() {
+    
+    let mut pixel = build_pixel();
+    loop {
+        pixel.all_on();         
+        pixel.render();
+        thread::sleep(time::Duration::from_millis(1000));
+        pixel.red(); 
+        pixel.render();
+        thread::sleep(time::Duration::from_millis(5000));
+        pixel.green(); 
+        pixel.render();
+        thread::sleep(time::Duration::from_millis(5000));
+        pixel.blue(); 
+        pixel.render();
+        thread::sleep(time::Duration::from_millis(5000));
+        pixel.right_on(); 
+        pixel.render();
+        thread::sleep(time::Duration::from_millis(5000));
+        pixel.left_on(); 
+        pixel.render();
+        thread::sleep(time::Duration::from_millis(5000));
+    }
+}
 
 fn do_canyon( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     
@@ -913,9 +937,10 @@ fn show_menu( display: &mut SSD1327, menu: i8) {display.clear();
 fn main() {
     
     // Uncomment to test
-    //_test();    
-    //_test2();    
-    //return;
+    //_test();    // sensors
+    //_test2();   // camera      
+    _test3();     // pixels
+    return;
 
 	// A list of locations, colours are updated when found.
 	let locations = [ NONE, NONE, NONE, NONE ];  

@@ -27,6 +27,39 @@ impl Pixel {
             
     }   
     
+    pub fn red( &mut self ) {
+        let leds = self.controller.leds_mut(0);	
+        leds[0] = [ 0, 0, 255, 0];
+        leds[1] = [ 0, 0, 255, 0];
+        leds[2] = [ 0, 0, 255, 0];
+        leds[3] = [ 0, 0, 255, 0];
+        leds[4] = [ 0, 0, 255, 0];
+        leds[5] = [ 0, 0, 255, 0];    
+            
+    }
+    
+    pub fn green( &mut self ) {
+        let leds = self.controller.leds_mut(0);	
+        leds[0] = [ 0, 255, 0, 0];
+        leds[1] = [ 0, 255, 0, 0];
+        leds[2] = [ 0, 255, 0, 0];
+        leds[3] = [ 0, 255, 0, 0];
+        leds[4] = [ 0, 255, 0, 0];
+        leds[5] = [ 0, 255, 0, 0];    
+            
+    }
+    
+    pub fn blue( &mut self ) {
+        let leds = self.controller.leds_mut(0);	
+        leds[0] = [ 255, 0, 0, 0];
+        leds[1] = [ 255, 0, 0, 0];
+        leds[2] = [ 255, 0, 0, 0];
+        leds[3] = [ 255, 0, 0, 0];
+        leds[4] = [ 255, 0, 0, 0];
+        leds[5] = [ 255, 0, 0, 0];                
+    }
+    
+    
     pub fn all_off( &mut self ) {
         let leds = self.controller.leds_mut(0);	
         leds[0] = [ 0, 0, 0, 0];
