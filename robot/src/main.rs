@@ -73,25 +73,23 @@ fn _test2() {
 fn _test3() {
     
     let mut pixel = build_pixel();
-    loop {
-        pixel.all_on();         
-        pixel.render();
-        thread::sleep(time::Duration::from_millis(1000));
+    loop {        
         pixel.red(); 
         pixel.render();
-        thread::sleep(time::Duration::from_millis(5000));
+        println!("Red");
+        thread::sleep(time::Duration::from_millis(1000));
         pixel.green(); 
         pixel.render();
-        thread::sleep(time::Duration::from_millis(5000));
+        println!("Green");
+        thread::sleep(time::Duration::from_millis(1000));
         pixel.blue(); 
         pixel.render();
-        thread::sleep(time::Duration::from_millis(5000));
-        pixel.right_on(); 
+        println!("Blue");
+        thread::sleep(time::Duration::from_millis(1000));
+        pixel.yellow(); 
         pixel.render();
-        thread::sleep(time::Duration::from_millis(5000));
-        pixel.left_on(); 
-        pixel.render();
-        thread::sleep(time::Duration::from_millis(5000));
+        println!("Yellow");
+        thread::sleep(time::Duration::from_millis(1000));        
     }
 }
 
