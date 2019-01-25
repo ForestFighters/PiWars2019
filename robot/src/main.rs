@@ -93,6 +93,21 @@ fn _test3() {
     }
 }
 
+fn _test4()
+{
+    let mut display = SSD1327::new("/dev/i2c-1");
+	display.begin().unwrap(); 
+    display.clear(); 
+    display.draw_text(4, 4, "Canyon...", LT_GREY).unwrap();
+    let tiny = image::open("The Canyons of Mars Menu Item.jpg").unwrap();
+    display.draw_image( 0, 16, tiny ).unwrap();
+    display.update_all().unwrap(); 
+    let mut pixel = build_pixel();
+    pixel.red(); 
+    pixel.render();
+    println!("Red"); 
+}
+
 fn do_canyon( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     
     while let Some(Event { id, event, time }) = gilrs.next_event() {
@@ -937,7 +952,8 @@ fn main() {
     // Uncomment to test
     //_test();    // sensors
     //_test2();   // camera      
-    _test3();     // pixels
+    //_test3();   // pixels
+    _test4();     // display
     return;
 
 	// A list of locations, colours are updated when found.
