@@ -95,7 +95,7 @@ fn _test3() {
 
 fn _test4()
 {
-    let mut display = SSD1327::new("/dev/i2c-1");
+    let mut display = SSD1327::new("/dev/i2c-3");
 	display.begin().unwrap(); 
     display.clear(); 
     display.draw_text(4, 4, "Canyon...", LT_GREY).unwrap();
@@ -539,7 +539,7 @@ fn do_straight( display: &mut SSD1327, gilrs: &mut Gilrs ) {
             
             if difference > 15 {
                 // turn right            
-                pixel.right_on();
+                pixel.right_red();
                 pixel.render();
                 println!("Turn Right {:04}  ", difference);
 				left_front_speed  = left_front_speed;
@@ -549,7 +549,7 @@ fn do_straight( display: &mut SSD1327, gilrs: &mut Gilrs ) {
                 
             } else if difference < -15 {
                 // turn left
-                pixel.left_on();
+                pixel.left_red();
                 pixel.render();
                 println!("Turn Left  {:04}  ", -difference);
                 left_front_speed  = left_front_speed + difference;
@@ -613,6 +613,8 @@ fn do_wheels_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     right_front_motor.stop(); 
 
     let servo = build_servo( 21 );
+    
+    let mut pixel = build_pixel(); 
 
     let mut gear = 1;
     let mut quit = false;
@@ -682,6 +684,8 @@ fn do_wheels_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
             right_rear_speed = 0;
             left_front_speed = 0;
             right_front_speed = 0;
+            pixel.all_off();
+            pixel.render();
         }
         else
         {
@@ -689,6 +693,17 @@ fn do_wheels_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
             left_rear_speed   = left_stick_y;
             right_front_speed = -right_stick_y;         
             right_rear_speed  = -right_stick_y;
+            
+            if left_stick_y > 10 || right_stick_y > 10 {
+                pixel.green();
+                pixel.render();
+            } else if left_stick_y < -10 || right_stick_y < -10 {
+                pixel.red();
+                pixel.render();
+            } else {
+                pixel.all_off();
+                pixel.render();
+            }
         }
         
         left_front_speed  = left_front_speed / gear;
@@ -740,7 +755,9 @@ fn do_mecanum_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     let right_front_motor = build_motor( 14, 27 );
     right_front_motor.init();    
     
-    let servo = build_servo( 21 );        
+    let servo = build_servo( 21 );  
+    
+    let mut pixel = build_pixel();      
         
     let mut gear = 2;
     let mut left_stick_x = 0;
@@ -846,8 +863,12 @@ fn do_mecanum_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
                 // right
                 if left_stick_x > 0 {
                     println!("going right");
+                    pixel.right_red(); 
+                    pixel.render();
                 } else {
                     println!("going left");
+                    pixel.left_red(); 
+                    pixel.render();
                 }
                 // if x > 0, front will be negative, rear will be positive - right
                 // if x < 0, front will be positive, rear will be negative - left
@@ -856,8 +877,19 @@ fn do_mecanum_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
                 right_front_speed = left_stick_x;
                 left_rear_speed = left_stick_x;
                 right_rear_speed = -left_stick_x;
-            }
+            } else {
+                if left_stick_y > 10 || right_stick_y > 10 {
+                    pixel.green();
+                    pixel.render();
+                } else if left_stick_y < -10 || right_stick_y < -10 {
+                    pixel.red();
+                    pixel.render();
+                } else {
+                    pixel.all_off();
+                    pixel.render();
+                }
             
+            }
             
             left_front_speed  = left_front_speed / gear;
             right_front_speed = right_front_speed / gear;
@@ -953,8 +985,8 @@ fn main() {
     //_test();    // sensors
     //_test2();   // camera      
     //_test3();   // pixels
-    _test4();     // display
-    return;
+    //_test4();     // display
+    //return;
 
 	// A list of locations, colours are updated when found.
 	let locations = [ NONE, NONE, NONE, NONE ];  

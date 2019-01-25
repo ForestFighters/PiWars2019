@@ -80,7 +80,7 @@ impl Pixel {
         leds[5] = [ 0, 0, 0, 0];            
     }   
     
-    pub fn right_on( &mut self ) {
+    pub fn right_red( &mut self ) {
         let leds = self.controller.leds_mut(0);        
         leds[0] = [ 0, 0,   0, 0];
         leds[1] = [ 0, 0,   0, 0];
@@ -90,7 +90,7 @@ impl Pixel {
         leds[5] = [ 0, 0, 255, 0];           
     }
 
-    pub fn left_on( &mut self ) {
+    pub fn left_red( &mut self ) {
         let leds = self.controller.leds_mut(0);        
         leds[0] = [ 0, 0, 255, 0];
         leds[1] = [ 0, 0, 255, 0];
@@ -98,6 +98,28 @@ impl Pixel {
         leds[3] = [ 0, 0,   0, 0];
         leds[4] = [ 0, 0,   0, 0];
         leds[5] = [ 0, 0,   0, 0];                
+    }
+    
+    pub fn left_green( &mut self ) {
+        let leds = self.controller.leds_mut(0);	
+        leds[0] = [ 0, 255, 0, 0];
+        leds[1] = [ 0, 255, 0, 0];
+        leds[2] = [ 0, 255, 0, 0];
+        leds[3] = [ 0,   0, 0, 0];
+        leds[4] = [ 0,   0, 0, 0];
+        leds[5] = [ 0,   0, 0, 0];    
+            
+    }
+    
+    pub fn right_green( &mut self ) {
+        let leds = self.controller.leds_mut(0);	
+        leds[0] = [ 0, 0, 0, 0];
+        leds[1] = [ 0, 0, 0, 0];
+        leds[2] = [ 0, 0, 0, 0];
+        leds[3] = [ 0, 255, 0, 0];
+        leds[4] = [ 0, 255, 0, 0];
+        leds[5] = [ 0, 255, 0, 0];    
+            
     }
         
 }
