@@ -38,15 +38,22 @@ const DRIVING_SPEED : i32 = 600;
 fn _test() {
        
     // Test compass
-    let mut compass = HMC5883L::new("/dev/i2c-9").unwrap();
+    let mut compass = HMC5883L::new("/dev/i2c-1").unwrap();
+    println!("Compass started");
     
     // Test distance sensors
     let mut leftfront = VL53L0X::new( "/dev/i2c-5").unwrap();
+    println!("left front started");
     let mut leftback = VL53L0X::new( "/dev/i2c-6").unwrap();
+    println!("left back started");
     let mut back = VL53L0X::new( "/dev/i2c-7").unwrap();
+    println!("back started");
     let mut front = VL53L0X::new( "/dev/i2c-8").unwrap();
+    println!("front started");
     let mut rightfront = VL53L0X::new( "/dev/i2c-10").unwrap(); 
+    println!("right front started");
     let mut rightback = VL53L0X::new( "/dev/i2c-9").unwrap();
+    println!("right back started");
 
     loop {
         println!("\x1B[HCurrent Heading {:.*}  ", 1, compass.read_degrees().unwrap());
@@ -110,10 +117,234 @@ fn _test4()
 
 fn do_canyon( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     
-    while let Some(Event { id, event, time }) = gilrs.next_event() {
-            println!("{:?} New event from {}: {:?}", time, id, event); 
-            break;              
+    const SPEED: i32 = 160;
+    
+    let mut pixel = build_pixel();
+    
+    let mut compass = HMC5883L::new("/dev/i2c-1").unwrap();
+    
+    let mut leftfront = VL53L0X::new( "/dev/i2c-5").unwrap();
+    println!("left front started");
+    let mut leftback = VL53L0X::new( "/dev/i2c-6").unwrap();
+    println!("left back started");
+    let mut back = VL53L0X::new( "/dev/i2c-7").unwrap();
+    println!("back started");
+    let mut front = VL53L0X::new( "/dev/i2c-8").unwrap();
+    println!("front started");
+    let mut rightfront = VL53L0X::new( "/dev/i2c-10").unwrap(); 
+    println!("right front started");
+    let mut rightback = VL53L0X::new( "/dev/i2c-9").unwrap();
+    println!("right back started");
+    
+    //Use BCM numbering    
+	println!("Initialized pigpio. Version: {}", initialize().unwrap());
+    let interval = time::Duration::from_millis(2000);
+
+    // Channel 4
+    let left_rear_motor = build_motor( 10, 11 ); 
+    left_rear_motor.init();
+        
+    // Channel 3
+    let right_rear_motor = build_motor( 9, 8 );
+    right_rear_motor.init();
+    
+    // Channel 2
+    let left_front_motor = build_motor( 15, 22 );
+    left_front_motor.init();
+    
+    // Channel 1
+    let right_front_motor = build_motor( 14, 27 );
+    right_front_motor.init();    
+    
+    left_rear_motor.stop();    
+    right_rear_motor.stop();
+    left_front_motor.stop();
+    right_front_motor.stop(); 
+    
+    let mut distance: u16 = 0;
+	let mut direction = "Front";
+	let mut state = 1;	
+	
+	let original = compass.read_degrees().unwrap();
+	
+	let mut left_rear_speed: i32;
+	let mut right_rear_speed: i32;
+	let mut left_front_speed: i32;
+	let mut right_front_speed: i32;
+    
+    let mut quit = false;
+    let mut running = false;
+    
+    let mut gear = 3;
+    
+    println!("Press start");
+	while !quit {
+        
+        while let Some(event) = gilrs.next_event() {
+            match event {
+            Event { id: _, event: EventType::ButtonPressed(Button::Start, _), .. } => {
+                println!("Start pressed");
+                // Start button -> running                    
+                pixel.all_off();                
+                display.draw_text(4, 4, "              ", WHITE).unwrap();
+                display.update().unwrap();
+                running = true;
+            }
+            Event { id: _, event: EventType::ButtonPressed(Button::North, _), .. } => {
+                gear = 1;
+                display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
+                display.update().unwrap();  
+                println!(" {0} ",gear); 
+             }
+             Event { id: _, event: EventType::ButtonPressed(Button::West, _), .. } => {
+                gear = 2;
+                display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
+                display.update().unwrap();  
+                println!(" {0} ",gear); 
+             }
+             Event { id: _, event: EventType::ButtonPressed(Button::East, _), .. } => {
+                gear = 3;
+                display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
+                display.update().unwrap();  
+                println!(" {0} ",gear); 
+             }
+             Event { id: _, event: EventType::ButtonPressed(Button::South, _), .. } => {
+                gear = 4;
+                display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
+                display.update().unwrap();  
+                println!(" {0} ",gear); 
+             }
+             Event { id: _, event: EventType::ButtonPressed(Button::Mode, _), .. } => {
+                println!("Mode....");
+                // Mode to exit                    
+                quit = true;
+                break;                    
+             }            
+                _ => (),
+            };
         }
+        
+        if running {
+            let heading = compass.read_degrees().unwrap();
+            
+            let mut diff = ((heading - original) * 8.0) as i32;		
+            
+            let front_dist = front.read().unwrap();
+            let front_right_dist = rightfront.read().unwrap();
+            let back_right_dist = rightback.read().unwrap();
+            let front_left_dist = leftfront.read().unwrap();
+            let back_left_dist = leftback.read().unwrap();
+            let back_dist = back.read().unwrap();				
+            
+            if state == 1 {			
+                diff = (150 - (front_right_dist) as i32);
+                distance = front_right_dist;
+                if front_dist < 150 {
+                    state = 2;
+                    direction = "Left";
+                    distance = front_dist;
+                }
+            }
+        
+            if state == 2 && front_left_dist < 150  {
+                // && front_dist < 150
+                state = 3;
+                direction = "Back";
+                distance = front_left_dist;
+            }
+            if state == 3 && back_dist < 150  {
+                // && front_right_dist < 150 && front_left_dist > 750
+                state = 4;
+                direction = "Left";
+                distance = back_dist;
+            }
+            if state == 4 && front_left_dist < 150 {
+                // && back_dist < 150 && front_right_dist > 750
+                state = 5;
+                direction = "Front";
+                distance = front_left_dist;
+            }
+            if state == 5 && front_dist < 150 {
+                // && front_right_dist < 150 && front_left_dist > 750
+                state = 6;
+                direction = "Left";
+                distance = front_dist;			
+            }
+            if state == 6 && front_left_dist < 150  {
+                // && front_dist < 150 && front_right_dist > 750
+                state = 7;
+                direction = "Back";
+                distance = front_left_dist;
+            }
+            if state == 7 && back_dist < 150 {
+                // && front_left_dist < 150 && front_dist > 750
+                state = 8;
+                direction = "Right";
+                distance = back_dist;
+            }
+            if state == 8 && front_right_dist < 150  {
+                // && front_left_dist > 750 && front_dist > 750
+                state = 9;
+                direction = "Back";
+                distance = front_right_dist;
+            }
+            if state == 9 && front_right_dist > 150 && front_dist > 2000 {
+                state = 10;
+                direction = "Finished";	
+                distance = front_dist;
+            }
+            if state == 10 {			
+                break;
+            }	
+            
+            println!("\x1B[HState {:?}, Direction {:#?}, Distance {:#?}mm  Heading {:#?}°  Diff {:#?}     ", state, direction, distance, heading, diff);
+            
+            if direction == "Front" {			
+                left_rear_speed =    (SPEED - diff);
+                right_rear_speed =   SPEED * -1;
+                left_front_speed =   (SPEED - diff);
+                right_front_speed =  SPEED * -1;
+            }
+            else if direction == "Back" {
+                left_rear_speed =    (SPEED + diff)  * -1;
+                right_rear_speed =   SPEED;
+                left_front_speed =   (SPEED + diff)  * -1;
+                right_front_speed =  SPEED;
+            }
+            else if direction == "Left" {
+                left_rear_speed =   SPEED * -1;
+                right_rear_speed =  SPEED;
+                left_front_speed =  SPEED;
+                right_front_speed = SPEED * -1;
+            }
+            else if direction == "Right" {
+                left_rear_speed =   SPEED;
+                right_rear_speed =  SPEED * -1;
+                left_front_speed =  SPEED * -1;
+                right_front_speed = SPEED;
+            }
+            else {
+                left_rear_speed =  0;
+                right_rear_speed = 0;
+                left_front_speed = 0;
+                right_front_speed = 0;			
+            }
+            
+            left_rear_motor.power(left_rear_speed);
+            right_rear_motor.power(right_rear_speed);	
+            left_front_motor.power(left_front_speed);
+            right_front_motor.power(right_front_speed);	
+            //println!("front {:#?}mm      ",front_dist);		
+            //println!("right {:#?}mm      ",front_right_dist);	
+            //println!("left {:#?}mm       ",front_left_dist);	
+            //println!("back {:#?}mm       ",back_dist);	
+        }
+	}
+	
+	left_rear_motor.stop();
+	right_rear_motor.stop();	
+	left_front_motor.stop();
+	right_front_motor.stop();
         
     display.clear();   
 }
@@ -494,7 +725,7 @@ fn do_straight( display: &mut SSD1327, gilrs: &mut Gilrs ) {
                 println!(" {0} ",gear); 
              }
             Event { id: _, event: EventType::ButtonPressed(Button::Mode, _), .. } => {
-                println!("DPad Right");
+                println!("Mode....");
                 // Mode to exit                    
                 quit = true;
                 break;                    
