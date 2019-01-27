@@ -19,6 +19,7 @@ use robot::hmc5883l::*;
 use robot::vl53l0x::*;
 use robot::camera::*;
 use robot::pixel::*;
+use robot::control::*;
 
 #[derive(PartialEq)]
 enum Rotation  { StartLeft, StartRight }  
@@ -100,8 +101,7 @@ fn _test3() {
     }
 }
 
-fn _test4()
-{
+fn _test4() {
     let mut display = SSD1327::new("/dev/i2c-3");
 	display.begin().unwrap(); 
     display.clear(); 
@@ -115,9 +115,27 @@ fn _test4()
     println!("Red"); 
 }
 
+fn _test5() {
+    let mut control = build_control();
+    control.init();
+    control.gear = 1;
+    control.speed( 800, 800, 800, 800 );
+    thread::sleep(time::Duration::from_millis(5000));
+    control.gear = 2;
+    control.speed( 800, 800, 800, 800 );
+    thread::sleep(time::Duration::from_millis(5000));
+    control.gear = 3;
+    control.speed( 800, 800, 800, 800 );
+    thread::sleep(time::Duration::from_millis(5000));
+    control.gear = 4;
+    control.speed( 800, 800, 800, 800 );
+    thread::sleep(time::Duration::from_millis(5000));
+    control.stop();
+}
+
 fn do_canyon( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     
-    const SPEED: i32 = 160;
+    const SPEED: i32 = 1000;
     
     let mut pixel = build_pixel();
     
@@ -136,30 +154,8 @@ fn do_canyon( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     let mut rightback = VL53L0X::new( "/dev/i2c-9").unwrap();
     println!("right back started");
     
-    //Use BCM numbering    
-	println!("Initialized pigpio. Version: {}", initialize().unwrap());
-    let interval = time::Duration::from_millis(2000);
-
-    // Channel 4
-    let left_rear_motor = build_motor( 10, 11 ); 
-    left_rear_motor.init();
-        
-    // Channel 3
-    let right_rear_motor = build_motor( 9, 8 );
-    right_rear_motor.init();
-    
-    // Channel 2
-    let left_front_motor = build_motor( 15, 22 );
-    left_front_motor.init();
-    
-    // Channel 1
-    let right_front_motor = build_motor( 14, 27 );
-    right_front_motor.init();    
-    
-    left_rear_motor.stop();    
-    right_rear_motor.stop();
-    left_front_motor.stop();
-    right_front_motor.stop(); 
+    let mut control = build_control();
+    control.init(); 
     
     let mut distance: u16 = 0;
 	let mut direction = "Front";
@@ -176,6 +172,8 @@ fn do_canyon( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     let mut running = false;
     
     let mut gear = 3;
+    control.set_gear( gear );
+    control.set_bias( 300 );
     
     println!("Press start");
 	while !quit {
@@ -189,30 +187,6 @@ fn do_canyon( display: &mut SSD1327, gilrs: &mut Gilrs ) {
                 display.draw_text(4, 4, "              ", WHITE).unwrap();
                 display.update().unwrap();
                 running = true;
-            }
-            Event { id: _, event: EventType::ButtonPressed(Button::North, _), .. } => {
-                gear = 1;
-                display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
-                display.update().unwrap();  
-                println!(" {0} ",gear); 
-             }
-             Event { id: _, event: EventType::ButtonPressed(Button::West, _), .. } => {
-                gear = 2;
-                display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
-                display.update().unwrap();  
-                println!(" {0} ",gear); 
-             }
-             Event { id: _, event: EventType::ButtonPressed(Button::East, _), .. } => {
-                gear = 3;
-                display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
-                display.update().unwrap();  
-                println!(" {0} ",gear); 
-             }
-             Event { id: _, event: EventType::ButtonPressed(Button::South, _), .. } => {
-                gear = 4;
-                display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
-                display.update().unwrap();  
-                println!(" {0} ",gear); 
              }
              Event { id: _, event: EventType::ButtonPressed(Button::Mode, _), .. } => {
                 println!("Mode....");
@@ -227,7 +201,8 @@ fn do_canyon( display: &mut SSD1327, gilrs: &mut Gilrs ) {
         if running {
             let heading = compass.read_degrees().unwrap();
             
-            let mut diff = ((heading - original) * 8.0) as i32;		
+            //let diff = ((heading - original) * 8.0) as i32;
+            let diff = 0;		
             
             let front_dist = front.read().unwrap();
             let front_right_dist = rightfront.read().unwrap();
@@ -237,7 +212,7 @@ fn do_canyon( display: &mut SSD1327, gilrs: &mut Gilrs ) {
             let back_dist = back.read().unwrap();				
             
             if state == 1 {			
-                diff = (150 - (front_right_dist) as i32);
+                //diff = (150 - (front_right_dist) as i32);
                 distance = front_right_dist;
                 if front_dist < 150 {
                     state = 2;
@@ -297,18 +272,18 @@ fn do_canyon( display: &mut SSD1327, gilrs: &mut Gilrs ) {
                 break;
             }	
             
-            println!("\x1B[HState {:?}, Direction {:#?}, Distance {:#?}mm  Heading {:#?}°  Diff {:#?}     ", state, direction, distance, heading, diff);
+            println!("State {:?}, Direction {:#?}, Distance {:#?}mm  Heading {:#?}°  Diff {:#?}     ", state, direction, distance, heading, diff);
             
             if direction == "Front" {			
-                left_rear_speed =    (SPEED - diff);
+                left_rear_speed =    SPEED - diff;
                 right_rear_speed =   SPEED * -1;
-                left_front_speed =   (SPEED - diff);
+                left_front_speed =   SPEED - diff;
                 right_front_speed =  SPEED * -1;
             }
             else if direction == "Back" {
-                left_rear_speed =    (SPEED + diff)  * -1;
+                left_rear_speed =    (SPEED + diff) * -1;
                 right_rear_speed =   SPEED;
-                left_front_speed =   (SPEED + diff)  * -1;
+                left_front_speed =   (SPEED + diff) * -1;
                 right_front_speed =  SPEED;
             }
             else if direction == "Left" {
@@ -329,26 +304,12 @@ fn do_canyon( display: &mut SSD1327, gilrs: &mut Gilrs ) {
                 left_front_speed = 0;
                 right_front_speed = 0;			
             }
-            
-            left_rear_motor.power(left_rear_speed);
-            right_rear_motor.power(right_rear_speed);	
-            left_front_motor.power(left_front_speed);
-            right_front_motor.power(right_front_speed);	
-            //println!("front {:#?}mm      ",front_dist);		
-            //println!("right {:#?}mm      ",front_right_dist);	
-            //println!("left {:#?}mm       ",front_left_dist);	
-            //println!("back {:#?}mm       ",back_dist);	
+            control.speed( left_rear_speed, right_rear_speed, left_front_speed, right_front_speed );
         }
 	}
-	
-	left_rear_motor.stop();
-	right_rear_motor.stop();	
-	left_front_motor.stop();
-	right_front_motor.stop();
-        
-    display.clear();   
+	control.stop();
+    display.clear(); 
 }
-
 
 fn print_colour( colour: i32 ){
 
@@ -371,65 +332,17 @@ fn print_colour( colour: i32 ){
 		
 	}					
 }
-
-fn drive( left_rear_motor: &Motor, right_rear_motor: &Motor, left_front_motor: &Motor, right_front_motor: &Motor, speed: i32, gear: i32 ) {
-    
-    let mut left_front_speed  = speed;
-    let mut left_rear_speed   = speed;
-    let mut right_front_speed = speed * -1;         
-    let mut right_rear_speed  = speed * -1;
-    
-    left_front_speed  = left_front_speed / gear;
-    right_front_speed = right_front_speed / gear;
-    left_rear_speed   = left_rear_speed / gear;
-    right_rear_speed  = right_rear_speed / gear; 
-    left_rear_motor.power(left_rear_speed);
-    right_rear_motor.power(right_rear_speed);   
-    left_front_motor.power(left_front_speed);
-    right_front_motor.power(right_front_speed);     	 
-}
-
-fn turn_left( left_rear_motor: &Motor, right_rear_motor: &Motor, left_front_motor: &Motor, right_front_motor: &Motor, speed: i32, gear: i32 ) {
-    let mut left_front_speed  = speed * -1;
-    let mut left_rear_speed   = speed * -1;
-    let mut right_front_speed = speed * -1;         
-    let mut right_rear_speed  = speed * -1;    
-    
-    left_front_speed  = left_front_speed / gear;
-    right_front_speed = right_front_speed / gear;
-    left_rear_speed   = left_rear_speed / gear;
-    right_rear_speed  = right_rear_speed / gear; 
-    left_rear_motor.power(left_rear_speed);
-    right_rear_motor.power(right_rear_speed);   
-    left_front_motor.power(left_front_speed);
-    right_front_motor.power(right_front_speed);    	 
-}
-
-fn turn_right( left_rear_motor: &Motor, right_rear_motor: &Motor, left_front_motor: &Motor, right_front_motor: &Motor, speed: i32, gear: i32 ) {
-    
-    let mut left_front_speed  = speed;
-    let mut left_rear_speed   = speed;
-    let mut right_front_speed = speed;         
-    let mut right_rear_speed  = speed;
-
-    left_front_speed  = left_front_speed / gear;
-    right_front_speed = right_front_speed / gear;
-    left_rear_speed   = left_rear_speed / gear;
-    right_rear_speed  = right_rear_speed / gear; 
-    left_rear_motor.power(left_rear_speed);
-    right_rear_motor.power(right_rear_speed);   
-    left_front_motor.power(left_front_speed);
-    right_front_motor.power(right_front_speed);    	 
-}
-
  
 fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs, mut locations: [ i32; 4 ] ) {	
     
     let mut pixel = build_pixel();
     pixel.all_on();
     
-    //Use BCM numbering    
-	println!("Initialized pigpio. Version: {}", initialize().unwrap());
+    ////Use BCM numbering    
+	//println!("Initialized pigpio. Version: {}", initialize().unwrap());
+    
+    let mut control = build_control();
+    control.init();
     
 	//let mut current = RED;
     let colours = [ RED, BLUE, YELLOW, GREEN ];  
@@ -438,24 +351,7 @@ fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs, mut locations: [ i32; 4 
 	let mut got_blue = false;
 	let mut got_yellow = false;
 	let mut got_green = false;
-	
-    let left_rear_motor = build_motor( 10, 11 ); 
-    left_rear_motor.init();
-        
-    let right_rear_motor = build_motor( 9, 8 );
-    right_rear_motor.init();
-    
-    let left_front_motor = build_motor( 15, 22 );
-    left_front_motor.init();
 
-    let right_front_motor = build_motor( 14, 27 );
-    right_front_motor.init();    
-    
-    left_rear_motor.stop();    
-    right_rear_motor.stop();
-    left_front_motor.stop();
-    right_front_motor.stop(); 
-	
 	let mut cam = build_camera( );
 	
     let mut front = VL53L0X::new( "/dev/i2c-8").unwrap();
@@ -471,6 +367,8 @@ fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs, mut locations: [ i32; 4 
     
     let mut current = 0;
     let mut gear = 3;
+    control.set_gear( gear );
+    control.set_bias( 300 );
     
     println!("Press Left(E) or Right(W)...");
     
@@ -583,9 +481,9 @@ fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs, mut locations: [ i32; 4 
                     //activity = Activities::MoveTowards;
                 //} else {
                     if rotation == Rotation::StartLeft {
-                        turn_left( &left_rear_motor, &right_rear_motor, &left_front_motor, &right_front_motor, TURNING_SPEED, gear );
+                        control.turn_left( TURNING_SPEED, gear );
                     } else {
-                        turn_right( &left_rear_motor, &right_rear_motor, &left_front_motor, &right_front_motor, TURNING_SPEED, gear );
+                        control.turn_right( TURNING_SPEED, gear );
                     }
                     activity = Activities::Searching;
                 //}
@@ -601,7 +499,7 @@ fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs, mut locations: [ i32; 4 
                         activity = Activities::MoveAway;
                     }
                 } else {
-                    drive( &left_rear_motor, &right_rear_motor, &left_front_motor, &right_front_motor, DRIVING_SPEED, gear );
+                    control.drive( DRIVING_SPEED, gear );
                     activity = Activities::MoveTowards;
                 }
             } else if activity == Activities::MoveAway  {	
@@ -611,17 +509,14 @@ fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs, mut locations: [ i32; 4 
                     println!("At max distance");
                     activity = Activities::Complete;
                 } else {
-                    drive( &left_rear_motor, &right_rear_motor, &left_front_motor, &right_front_motor, DRIVING_SPEED, gear );
+                    control.drive( DRIVING_SPEED, gear );
                     activity = Activities::MoveAway;
                 }
             } else if activity == Activities::Complete  {	
                 println!("Resume searching");                                
                 activity = Activities::Searching;                
             } else if activity == Activities::Done  {
-                left_rear_motor.stop();    
-                right_rear_motor.stop();
-                left_front_motor.stop();
-                right_front_motor.stop();  	                                
+                control.stop(); 	                                
                 break;
             } else if activity == Activities::Finished  {
                 // Quit
@@ -634,43 +529,21 @@ fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs, mut locations: [ i32; 4 
 		}            
 	}
         
+    control.stop();
     display.clear();   
-    pixel.all_off();      
-    terminate();  
+    pixel.all_off();       
 }
-
 
 fn do_straight( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     
     let mut pixel = build_pixel();
-    
-    //Use BCM numbering    
-	println!("Initialized pigpio. Version: {}", initialize().unwrap());
     let interval = time::Duration::from_millis(2000);
-
-    // Channel 4
-    let left_rear_motor = build_motor( 10, 11 ); 
-    left_rear_motor.init();
-        
-    // Channel 3
-    let right_rear_motor = build_motor( 9, 8 );
-    right_rear_motor.init();
     
-    // Channel 2
-    let left_front_motor = build_motor( 15, 22 );
-    left_front_motor.init();
+    let mut control = build_control();
+    control.init();
+    control.set_gear( 1 );
     
-    // Channel 1
-    let right_front_motor = build_motor( 14, 27 );
-    right_front_motor.init();    
-    
-    left_rear_motor.stop();    
-    right_rear_motor.stop();
-    left_front_motor.stop();
-    right_front_motor.stop(); 
-        
     let mut left = VL53L0X::new( "/dev/i2c-5").unwrap();
-    let mut front = VL53L0X::new( "/dev/i2c-8").unwrap();
     let mut right = VL53L0X::new( "/dev/i2c-10").unwrap(); 
     
     pixel.all_on(); 
@@ -681,8 +554,6 @@ fn do_straight( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     display.update_all().unwrap();
     
     let mut target: i32 = 0;
-    
-    let mut gear = 3;
     
     let mut quit = false;
     let mut running = false;
@@ -700,30 +571,6 @@ fn do_straight( display: &mut SSD1327, gilrs: &mut Gilrs ) {
                 println!("Target {:?}", target); 
                 running = true;
             }
-            Event { id: _, event: EventType::ButtonPressed(Button::North, _), .. } => {
-                gear = 1;
-                display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
-                display.update().unwrap();  
-                println!(" {0} ",gear); 
-             }
-             Event { id: _, event: EventType::ButtonPressed(Button::West, _), .. } => {
-                gear = 2;
-                display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
-                display.update().unwrap();  
-                println!(" {0} ",gear); 
-             }
-             Event { id: _, event: EventType::ButtonPressed(Button::East, _), .. } => {
-                gear = 3;
-                display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
-                display.update().unwrap();  
-                println!(" {0} ",gear); 
-             }
-             Event { id: _, event: EventType::ButtonPressed(Button::South, _), .. } => {
-                gear = 4;
-                display.draw_text(4, 4, &gear.to_string(), LT_GREY).unwrap();
-                display.update().unwrap();  
-                println!(" {0} ",gear); 
-             }
             Event { id: _, event: EventType::ButtonPressed(Button::Mode, _), .. } => {
                 println!("Mode....");
                 // Mode to exit                    
@@ -732,40 +579,19 @@ fn do_straight( display: &mut SSD1327, gilrs: &mut Gilrs ) {
             }            
             _ => (),
             };
-        }    
-       
+        } 
+        
         if running {                            
-			let mut left_rear_speed: i32;
-			let mut right_rear_speed: i32;
-			let mut left_front_speed: i32;
-			let mut right_front_speed: i32;
+			let mut left_rear_speed: i32 = 1000;
+			let mut right_rear_speed: i32 = -1000;
+			let mut left_front_speed: i32 = 1000;
+			let mut right_front_speed: i32 = -1000;
 			
             let right_dist: i32 = right.read().unwrap() as i32;
             let left_dist: i32 = left.read().unwrap() as i32;
                                     
-            let front_dist: i32 = front.read().unwrap() as i32;
-            println!("Front {:#?}mm, Right {:#?}mm, Left {:#?}mm ",front_dist, right_dist, left_dist);            
-            
-            {
-                //if front_dist < 400 {
-                    //left_rear_motor.stop();    
-                    //right_rear_motor.stop();
-                    //left_front_motor.stop();
-                    //right_front_motor.stop();  
-                    //break;
-                //}
-            }
-			            
-            left_front_speed  = 1000;
-            left_rear_speed   = 1000;
-            right_front_speed = -1000;         
-            right_rear_speed  = -1000;
-            
-            left_front_speed  = left_front_speed / gear;
-            right_front_speed = right_front_speed / gear;
-            left_rear_speed   = left_rear_speed / gear;
-            right_rear_speed  = right_rear_speed / gear;        
-            
+            println!("Right {:#?}mm, Left {:#?}mm ", right_dist, left_dist);            
+                       
             let difference: i32 = (target - (left_dist - right_dist)) * 3;
             
             if difference > 15 {
@@ -799,23 +625,17 @@ fn do_straight( display: &mut SSD1327, gilrs: &mut Gilrs ) {
                     //println!(" {0}, {1}, {2}, {3} ", left_rear_speed, right_rear_speed, left_front_speed, right_front_speed );
                 //} 
             }
-            left_rear_motor.power(left_rear_speed);
-			right_rear_motor.power(right_rear_speed);   
-			left_front_motor.power(left_front_speed);
-			right_front_motor.power(right_front_speed);                                 
+            control.speed( left_rear_speed, right_rear_speed, left_front_speed, right_front_speed );
         }
     }
     
-    left_rear_motor.stop();    
-    right_rear_motor.stop();
-    left_front_motor.stop();
-    right_front_motor.stop();   
+    control.stop();    
     
     display.clear();  
     pixel.all_off();  
-    thread::sleep(interval);    
-    terminate();  
+    thread::sleep(interval); 
 }
+
 
 fn do_wheels_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     println!("Initialized pigpio. Version: {}", initialize().unwrap());
@@ -1217,6 +1037,7 @@ fn main() {
     //_test2();   // camera      
     //_test3();   // pixels
     //_test4();     // display
+    //_test5();     // Motors
     //return;
 
 	// A list of locations, colours are updated when found.

@@ -5,4 +5,5 @@ pub mod servo;
 pub mod motor;
 pub mod camera;
 pub mod pixel;
+pub mod control;
 
