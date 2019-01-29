@@ -2,6 +2,7 @@ extern crate rust_pigpio;
 extern crate i2cdev;
 extern crate byteorder;
 
+use std::{thread, time};
 use self::rust_pigpio::*;
 use motor::*;
 
@@ -39,10 +40,18 @@ impl Control {
     }
     
     pub fn speed( &self, left_rear_speed: i32, right_rear_speed: i32, left_front_speed: i32, right_front_speed: i32 ) {
-      self.left_rear_motor.power((left_rear_speed + self.bias) / self.gear);
-      self.right_rear_motor.power(right_rear_speed / self.gear);   
-      self.left_front_motor.power((left_front_speed + self.bias) / self.gear);
-      self.right_front_motor.power(right_front_speed / self.gear); 
+      let lr_speed = (left_rear_speed + self.bias) / self.gear;
+      let rr_speed = right_rear_speed / self.gear;
+      let lf_speed = (left_front_speed + self.bias) / self.gear;
+      let rf_speed = right_front_speed / self.gear;
+
+      if lr_speed != 0 {
+        println!("Left Rear {0}, Left Front {1}, Right Rear {2}, Right Front {3} ", lr_speed, lf_speed, rr_speed, rf_speed );
+      }
+      self.left_rear_motor.power(lr_speed);
+      self.right_rear_motor.power(rr_speed);   
+      self.left_front_motor.power(lf_speed);
+      self.right_front_motor.power(rf_speed); 
     } 
     
     pub fn stop( &self ){               
@@ -77,6 +86,8 @@ impl Drop for Control {
     
     fn drop( &mut self ) {
       println!("Terminate pigpio");
+      let interval = time::Duration::from_millis(2000);
+      thread::sleep(interval);  
       terminate(); 
     }
 }

@@ -135,7 +135,9 @@ fn _test5() {
 
 fn do_canyon( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     
-    const SPEED: i32 = 1000;
+    const SPEED: i32 = 700;
+    const MINDIST: u16 = 250;
+    const MAXDIST: u16= 2000;
     
     let mut pixel = build_pixel();
     
@@ -171,9 +173,9 @@ fn do_canyon( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     let mut quit = false;
     let mut running = false;
     
-    let mut gear = 3;
+    let mut gear = 5;
     control.set_gear( gear );
-    control.set_bias( 300 );
+    control.set_bias( 0 );
     
     println!("Press start");
 	while !quit {
@@ -201,8 +203,7 @@ fn do_canyon( display: &mut SSD1327, gilrs: &mut Gilrs ) {
         if running {
             let heading = compass.read_degrees().unwrap();
             
-            //let diff = ((heading - original) * 8.0) as i32;
-            let diff = 0;		
+            let diff = ((heading - original) * 50.0) as i32;	
             
             let front_dist = front.read().unwrap();
             let front_right_dist = rightfront.read().unwrap();
@@ -212,61 +213,61 @@ fn do_canyon( display: &mut SSD1327, gilrs: &mut Gilrs ) {
             let back_dist = back.read().unwrap();				
             
             if state == 1 {			
-                //diff = (150 - (front_right_dist) as i32);
                 distance = front_right_dist;
-                if front_dist < 150 {
+                if front_dist < MINDIST {
                     state = 2;
                     direction = "Left";
                     distance = front_dist;
                 }
             }
         
-            if state == 2 && front_left_dist < 150  {
+            if state == 2 && front_left_dist < MINDIST  {
                 // && front_dist < 150
                 state = 3;
                 direction = "Back";
                 distance = front_left_dist;
             }
-            if state == 3 && back_dist < 150  {
+            if state == 3 && back_dist < MINDIST  {
                 // && front_right_dist < 150 && front_left_dist > 750
                 state = 4;
                 direction = "Left";
                 distance = back_dist;
             }
-            if state == 4 && front_left_dist < 150 {
+            if state == 4 && front_left_dist < MINDIST {
                 // && back_dist < 150 && front_right_dist > 750
                 state = 5;
                 direction = "Front";
                 distance = front_left_dist;
             }
-            if state == 5 && front_dist < 150 {
+            if state == 5 && front_dist < MINDIST {
                 // && front_right_dist < 150 && front_left_dist > 750
                 state = 6;
                 direction = "Left";
                 distance = front_dist;			
             }
-            if state == 6 && front_left_dist < 150  {
+            if state == 6 && front_left_dist < MINDIST  {
                 // && front_dist < 150 && front_right_dist > 750
                 state = 7;
                 direction = "Back";
                 distance = front_left_dist;
             }
-            if state == 7 && back_dist < 150 {
+            if state == 7 && back_dist < MINDIST {
                 // && front_left_dist < 150 && front_dist > 750
                 state = 8;
                 direction = "Right";
                 distance = back_dist;
             }
-            if state == 8 && front_right_dist < 150  {
+            if state == 8 && front_right_dist < MINDIST {
                 // && front_left_dist > 750 && front_dist > 750
                 state = 9;
                 direction = "Back";
                 distance = front_right_dist;
             }
-            if state == 9 && front_right_dist > 150 && front_dist > 2000 {
+            if state == 9 && front_right_dist > MINDIST && front_dist > MAXDIST {
                 state = 10;
                 direction = "Finished";	
                 distance = front_dist;
+                control.stop();
             }
             if state == 10 {			
                 break;
@@ -304,6 +305,7 @@ fn do_canyon( display: &mut SSD1327, gilrs: &mut Gilrs ) {
                 left_front_speed = 0;
                 right_front_speed = 0;			
             }
+            
             control.speed( left_rear_speed, right_rear_speed, left_front_speed, right_front_speed );
         }
 	}
@@ -368,7 +370,7 @@ fn do_hubble( display: &mut SSD1327, gilrs: &mut Gilrs, mut locations: [ i32; 4 
     let mut current = 0;
     let mut gear = 3;
     control.set_gear( gear );
-    control.set_bias( 300 );
+    control.set_bias( 0 );
     
     println!("Press Left(E) or Right(W)...");
     
@@ -786,31 +788,18 @@ fn do_wheels_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
 
 fn do_mecanum_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     
-    println!("Initialized pigpio. Version: {}", initialize().unwrap());
-    let interval = time::Duration::from_millis(2000);
-
-    //Use BCM numbering 
-    // Channel 4
-    let left_rear_motor = build_motor( 10, 11 ); 
-    left_rear_motor.init();
-        
-    // Channel 3
-    let right_rear_motor = build_motor( 9, 8 );
-    right_rear_motor.init();
-
-    // Channel 2
-    let left_front_motor = build_motor( 15, 22 );
-    left_front_motor.init();
-
-    // Channel 1
-    let right_front_motor = build_motor( 14, 27 );
-    right_front_motor.init();    
+    const DEADZONE: i32 = 10;
+    
+    let mut control = build_control();
+    control.init();
     
     let servo = build_servo( 21 );  
     
     let mut pixel = build_pixel();      
         
     let mut gear = 2;
+    control.set_gear( gear );
+    
     let mut left_stick_x = 0;
     let mut left_stick_y = 0;
     let mut right_stick_y = 0;
@@ -819,7 +808,7 @@ fn do_mecanum_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     let mut dpad = 0;
     let mut quit = false;
     while !quit { 
-        //let value: f32 = 0.0;
+    
         while let Some(event) = gilrs.next_event() {
             match event {
                  Event { id: _, event: EventType::ButtonPressed(Button::Mode, _), .. } => {
@@ -889,12 +878,14 @@ fn do_mecanum_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
             left_front_speed = 0;
             right_front_speed = 0;
             
-            if left_stick_y != 0 && right_stick_y != 0 {           
+            
+            
+            if (left_stick_y > DEADZONE || left_stick_y < -DEADZONE) || (right_stick_y > DEADZONE || right_stick_y < -DEADZONE) {           
                 //left_front_speed  = -left_stick_x + left_stick_y - right_stick_x;               
                 //left_rear_speed   = left_stick_x + left_stick_y - right_stick_x;                
                 //right_rear_speed  = -left_stick_x - left_stick_y + right_stick_x;
                 //right_front_speed = left_stick_x - left_stick_y + right_stick_x;
-                if left_stick_x < 10 && left_stick_x > -10 { 
+                if left_stick_x < DEADZONE && left_stick_x > -DEADZONE { 
                     left_front_speed  = left_stick_y;
                     left_rear_speed   = left_stick_y;
                     right_front_speed = -right_stick_y;         
@@ -907,11 +898,10 @@ fn do_mecanum_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
                     right_front_speed = left_stick_y + right_stick_x;
                 } 
             } 
-            if (left_stick_x > 10 || left_stick_x < -10) && (left_stick_y < 10 && left_stick_y > -10) && (right_stick_y < 10 && right_stick_y > -10) {
+            if (left_stick_x > DEADZONE || left_stick_x < -DEADZONE) && (left_stick_y < DEADZONE && left_stick_y > -DEADZONE) && (right_stick_y < DEADZONE && right_stick_y > -DEADZONE) {
                 // go sideways - 
                 // left = front forward, rear backwards
                 // right = front backward, rear forwards
-                // right
                 if left_stick_x > 0 {
                     println!("going right");
                     pixel.right_red(); 
@@ -939,21 +929,9 @@ fn do_mecanum_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
                     pixel.all_off();
                     pixel.render();
                 }
-            
             }
             
-            left_front_speed  = left_front_speed / gear;
-            right_front_speed = right_front_speed / gear;
-            left_rear_speed   = left_rear_speed / gear;
-            right_rear_speed  = right_rear_speed / gear;        
-            
-            if left_rear_speed != 0 || right_rear_speed != 0 || left_front_speed != 0 || right_front_speed != 0  {
-                println!("left rear: {0}, right rear: {1}, left front: {2} right front: {3}", left_rear_speed, right_rear_speed, left_front_speed, right_front_speed );
-            }   
-            left_rear_motor.power(left_rear_speed);
-            right_rear_motor.power(right_rear_speed);  
-            left_front_motor.power(left_front_speed);
-            right_front_motor.power(right_front_speed); 
+            control.speed( left_rear_speed, right_rear_speed, left_front_speed, right_front_speed );
             
             if dpad == 1 {
                 servo.set_pulse_width( 2500 );
@@ -965,13 +943,8 @@ fn do_mecanum_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
             
     }
     
-    left_rear_motor.stop();    
-    right_rear_motor.stop();
-    left_front_motor.stop();
-    right_front_motor.stop();
+    control.stop();
     
-    thread::sleep(interval);    
-    terminate();  
 }
 
 fn show_menu( display: &mut SSD1327, menu: i8) {display.clear();
