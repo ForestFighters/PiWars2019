@@ -7,6 +7,8 @@ extern crate image;
 extern crate robot;
 
 use std::{thread, time};
+use std::time::Instant;
+use std::time::Duration;
 use rust_pigpio::*;
 
 use gilrs::{Gilrs, Button, Event, EventType };
@@ -947,6 +949,124 @@ fn do_mecanum_rc( display: &mut SSD1327, gilrs: &mut Gilrs ) {
     
 }
 
+fn do_run_tests( display: &mut SSD1327, gilrs: &mut Gilrs ) {
+    
+    let mut pixel = build_pixel();    
+    
+    // Test compass
+    let mut compass = HMC5883L::new("/dev/i2c-1").unwrap();
+    println!("Compass started");
+    
+    // Test distance sensors
+    let mut leftfront = VL53L0X::new( "/dev/i2c-5").unwrap();
+    println!("left front started");
+    let mut leftback = VL53L0X::new( "/dev/i2c-6").unwrap();
+    println!("left back started");
+    let mut back = VL53L0X::new( "/dev/i2c-7").unwrap();
+    println!("back started");
+    let mut front = VL53L0X::new( "/dev/i2c-8").unwrap();
+    println!("front started");
+    let mut rightfront = VL53L0X::new( "/dev/i2c-10").unwrap(); 
+    println!("right front started");
+    let mut rightback = VL53L0X::new( "/dev/i2c-9").unwrap();
+    println!("right back started");
+    
+    let mut heading = compass.read_degrees().unwrap();
+    let mut lb_dist = leftback.read().unwrap();
+    let mut lf_dist = leftfront.read().unwrap();
+    let mut bk_dist = back.read().unwrap();
+    let mut ft_dist = front.read().unwrap();
+    let mut rb_dist = rightback.read().unwrap();
+    let mut rf_dist = rightfront.read().unwrap(); 
+    
+    let mut colour = 0; 
+    pixel.red(); 
+    pixel.render();
+    println!("Red");
+    
+    let interval = Duration::from_millis(200);
+    let mut now = Instant::now();
+    
+    let mut quit = false;
+    while !quit { 
+        
+        if Instant::now().duration_since(now) > interval {
+            now = Instant::now();
+            colour = colour + 1;
+            if colour > 4 {
+                colour = 0;
+            }
+            if colour == 0 {
+                pixel.red(); 
+                pixel.render();
+                println!("Red");
+            }
+            else if colour == 1 {
+                pixel.green(); 
+                pixel.render();
+                println!("Green");
+            }
+            else if colour == 2 {
+                pixel.blue(); 
+                pixel.render();
+                println!("Blue");
+            }
+            else if colour == 3 {
+                pixel.yellow(); 
+                pixel.render();
+                println!("Yellow");
+            }            
+        }
+    
+        while let Some(event) = gilrs.next_event() {
+          match event {
+                Event { id: _, event: EventType::ButtonPressed(Button::Mode, _), .. } => {
+                     println!("Mode Pressed");
+                     quit = true;
+                     break;
+                }
+                Event { id: _, event: EventType::ButtonPressed(Button::North, _), .. } => {
+                    println!("North Pressed");
+                    heading = compass.read_degrees().unwrap();
+                    lb_dist = leftback.read().unwrap();
+                    lf_dist = leftfront.read().unwrap();
+                    bk_dist = back.read().unwrap();
+                    ft_dist = front.read().unwrap();
+                    rb_dist = rightback.read().unwrap();
+                    rf_dist = rightfront.read().unwrap(); 
+                    display.clear();
+                    display.draw_text( 0, 8, "Head:           ", WHITE).unwrap(); 
+                    display.draw_text(56, 8, &format!("{:5.2} ",heading), WHITE).unwrap();
+                    display.draw_text( 0,16, "LB:", WHITE).unwrap(); 
+                    display.draw_text(56,16, &format!("{:5.2} ",lb_dist), WHITE).unwrap();
+                    display.draw_text( 0,24, "RB:", WHITE).unwrap(); 
+                    display.draw_text(56,24, &format!("{:5.2} ",rb_dist), WHITE).unwrap();
+                    display.draw_text( 0,32, "Front:", WHITE).unwrap(); 
+                    display.draw_text(56,32, &format!("{:5.2} ",ft_dist), WHITE).unwrap();
+                    display.draw_text( 0,40, "Back:", WHITE).unwrap(); 
+                    display.draw_text(56,40, &format!("{:5.2} ",bk_dist), WHITE).unwrap();
+                    display.draw_text( 0,48, "RB:", WHITE).unwrap(); 
+                    display.draw_text(56,48, &format!("{:5.2} ",rb_dist), WHITE).unwrap();
+                    display.draw_text( 0,56, "RF:", WHITE).unwrap(); 
+                    display.draw_text(56,56, &format!("{:5.2} ",rf_dist), WHITE).unwrap();
+                    display.update().unwrap();  
+                    break;
+                }
+                _ => {
+                    break;
+                }
+          };    
+        }
+        println!("Current Heading      {:5.2}  ", heading);
+        println!("Left Back Distance   {:5.2}  ", lb_dist);
+        println!("Left Front Distance  {:5.2}  ", lf_dist);
+        println!("Back Distance        {:5.2}  ", bk_dist);
+        println!("Front Distance       {:5.2}  ", ft_dist);
+        println!("Right Back Distance  {:5.2}  ", rb_dist);
+        println!("Right Front Distance {:5.2}  ", rf_dist);                  
+    }
+}
+
 fn show_menu( display: &mut SSD1327, menu: i8) {display.clear();
     display.draw_text(20, 42, "Forest", WHITE).unwrap();
     display.draw_text(20, 50, "Fighters", WHITE).unwrap();
@@ -998,6 +1118,12 @@ fn show_menu( display: &mut SSD1327, menu: i8) {display.clear();
         display.draw_image( 0, 16, tiny ).unwrap();
         display.draw_text(32, 108, "SHUTDOWN", WHITE).unwrap();
     }
+    else if menu == 7 {
+        let tiny = image::open("RunTests.jpg").unwrap();
+
+        display.draw_image( 0, 16, tiny ).unwrap();
+        display.draw_text(32, 108, "Run Tests", WHITE).unwrap();
+    }
          
     display.update_all().unwrap();   
     
@@ -1033,11 +1159,11 @@ fn main() {
     let mut quit = false;
     while !quit {
         
-        if menu > 6 {
+        if menu > 7 {
             menu = 0;
         }
         else if menu < 0 {
-            menu = 6;
+            menu = 7;
         }
         
         if menu != prev {
@@ -1102,7 +1228,15 @@ fn main() {
                         display.update_all().unwrap();  
                         quit = true;
                         break;
-                    }    
+                    }   
+                    if menu == 7 {
+                        display.clear(); 
+                        display.draw_text(4, 4, "Run Tests...", LT_GREY).unwrap();
+                        display.update_all().unwrap();  
+                        do_run_tests( &mut display, &mut gilrs );
+                        prev = -1;
+                        break;
+                    }   
                 }               
                 _ => (),
             };
