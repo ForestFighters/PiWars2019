@@ -45,9 +45,6 @@ impl Control {
       let lf_speed = (left_front_speed + self.bias) / self.gear;
       let rf_speed = right_front_speed / self.gear;
 
-      if lr_speed != 0 {
-        println!("Left Rear {0}, Left Front {1}, Right Rear {2}, Right Front {3} ", lr_speed, lf_speed, rr_speed, rf_speed );
-      }
       self.left_rear_motor.power(lr_speed);
       self.right_rear_motor.power(rr_speed);   
       self.left_front_motor.power(lf_speed);
@@ -86,9 +83,9 @@ impl Drop for Control {
     
     fn drop( &mut self ) {
       println!("Terminate pigpio");
-      let interval = time::Duration::from_millis(2000);
-      thread::sleep(interval);  
-      terminate(); 
+      terminate();
+      let interval = time::Duration::from_millis(2000);      
+      thread::sleep(interval);         
     }
 }
 

@@ -2,6 +2,7 @@
 name = "robot"
 version = "0.1.0"
 authors = ["Phil Willis <ptbw@hotmail.com>"]
+edition = "2015"
 
 [dependencies]
 rust-pigpio = "0.2.0"
