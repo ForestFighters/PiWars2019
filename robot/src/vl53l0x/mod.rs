@@ -27,47 +27,45 @@ impl VL53L0X {
         // delay before taking first reading
         thread::sleep(time::Duration::from_millis(100));
 
-        let _revision = tof
-            .smbus_read_byte_data(VL53L0X_REG_IDENTIFICATION_REVISION_ID)
-            .unwrap();
-        let _model = tof
-            .smbus_read_byte_data(VL53L0X_REG_IDENTIFICATION_MODEL_ID)
-            .unwrap();
+        let _revision = try!(tof.smbus_read_byte_data(VL53L0X_REG_IDENTIFICATION_REVISION_ID));
+
+        let _model = try!(tof.smbus_read_byte_data(VL53L0X_REG_IDENTIFICATION_MODEL_ID));
+
+        let _prerange = try!(tof.smbus_read_byte_data(VL53L0X_REG_PRE_RANGE_CONFIG_VCSEL_PERIOD));
+
+        let _range = try!(tof.smbus_read_byte_data(VL53L0X_REG_FINAL_RANGE_CONFIG_VCSEL_PERIOD));
+
         //println! ("Revision: {0} Model {1}", revision, model);
-
-        let _prerange = tof
-            .smbus_read_byte_data(VL53L0X_REG_PRE_RANGE_CONFIG_VCSEL_PERIOD)
-            .unwrap();
         //println! ("PRE_RANGE_CONFIG_VCSEL_PERIOD = {0}",prerange);
-
-        let _range = tof
-            .smbus_read_byte_data(VL53L0X_REG_FINAL_RANGE_CONFIG_VCSEL_PERIOD)
-            .unwrap();
         //println!("FINAL_RANGE_CONFIG_VCSEL_PERIOD = {0}",range);
 
         Ok(VL53L0X { tof: Box::new(tof) })
     }
+    
+    pub fn read(&mut self) -> u16 {        
+        
+        let dist = match self.read_internal() {
+            Ok(dist) => dist,
+            Err(e) => {
+                println!("Bad read {:?}", e);
+                return 0;
+            }
+        };          
+        return dist;  
+    }
 
-    pub fn read(&mut self) -> Result<(u16), Box<LinuxI2CError>> {
-        let interval = time::Duration::from_millis(1); // was 10
+    fn read_internal(&mut self) -> Result<(u16), Box<LinuxI2CError>> {
+        let interval = time::Duration::from_millis(2); // was 10
         let mut cnt = 0;
-        let _start = self
-            .tof
-            .smbus_write_byte_data(VL53L0X_REG_SYSRANGE_START, 0x01);
-        let mut status = self
-            .tof
-            .smbus_read_byte_data(VL53L0X_REG_RESULT_RANGE_STATUS)
-            .unwrap();
+        let _start = try!(self.tof.smbus_write_byte_data(VL53L0X_REG_SYSRANGE_START, 0x01));
+        let mut status = try!(self.tof.smbus_read_byte_data(VL53L0X_REG_RESULT_RANGE_STATUS));
         loop {
-            if (status & 0x01) == 0x01 || cnt >= 100 {
+            if (status & 0x01) == 0x01 || cnt >= 1000 {
                 break;
             }
             // 1 second waiting time max
             thread::sleep(interval);
-            status = self
-                .tof
-                .smbus_read_byte_data(VL53L0X_REG_RESULT_RANGE_STATUS)
-                .unwrap();
+            status = try!(self.tof.smbus_read_byte_data(VL53L0X_REG_RESULT_RANGE_STATUS));
             cnt += 1;
         }
 
@@ -75,17 +73,11 @@ impl VL53L0X {
             println!("not ready");
         }
 
-        let data = self
-            .tof
-            .smbus_read_i2c_block_data(VL53L0X_REG_RESULT_RANGE_STATUS, 12)
-            .unwrap();
-        //println!("{:#?}",data);
+        let data = try!(self.tof.smbus_read_i2c_block_data(VL53L0X_REG_RESULT_RANGE_STATUS, 12));        
 
         let dist1: u16 = (data[10]).into();
         let dist2: u16 = (data[11]).into();
         let mut distance = (dist1 * 256) + dist2;
-        //println!("distance {:#?}mm",distance);
-        // return distance
         if distance <= 20 || distance > 1900 {
             distance = 9999
         }

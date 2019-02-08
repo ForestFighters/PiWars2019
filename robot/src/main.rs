@@ -47,6 +47,10 @@ const RED: i32 = 0;
 const BLUE: i32 = 1;
 const YELLOW: i32 = 2;
 const GREEN: i32 = 3;
+const PURPLE: i32 = 4;
+const CYAN: i32 = 5;
+const ALL: i32 = 6;
+
 
 const TURNING_SPEED: i32 = 700;
 const DRIVING_SPEED: i32 = 600;
@@ -76,23 +80,19 @@ fn _test() {
             1,
             compass.read_degrees().unwrap()
         );
-        println!("Left Back Distance   {:.*}   ", 1, leftback.read().unwrap());
-        println!(
-            "Left Front Distance  {:.*}   ",
-            1,
-            leftfront.read().unwrap()
-        );
-        println!("Back Distance        {:.*}   ", 1, back.read().unwrap());
-        println!("Front Distance       {:.*}   ", 1, front.read().unwrap());
+        println!("Left Back Distance   {:.*}   ", 1, leftback.read());
+        println!("Left Front Distance  {:.*}   ", 1, leftfront.read());
+        println!("Back Distance        {:.*}   ", 1, back.read());
+        println!("Front Distance       {:.*}   ", 1, front.read());
         println!(
             "Right Back Distance  {:.*}   ",
             1,
-            rightback.read().unwrap()
+            rightback.read()
         );
         println!(
             "Right Front Distance {:.*}   ",
             1,
-            rightfront.read().unwrap()
+            rightfront.read()
         );
     }
 }
@@ -166,17 +166,20 @@ fn do_canyon(context: &mut Context) {
     const MAXDIST: u16 = 2000;
 
     let mut compass = HMC5883L::new("/dev/i2c-1").unwrap();
-
-    let mut leftfront = VL53L0X::new("/dev/i2c-5").unwrap();
-    println!("left front started");
-    let mut leftback = VL53L0X::new("/dev/i2c-6").unwrap();
-    println!("left back started");
-    let mut back = VL53L0X::new("/dev/i2c-7").unwrap();
-    println!("back started");
+    
+    // Distance sensors group 1
     let mut front = VL53L0X::new("/dev/i2c-8").unwrap();
     println!("front started");
+    let mut leftfront = VL53L0X::new("/dev/i2c-5").unwrap();
+    println!("left front started");
     let mut rightfront = VL53L0X::new("/dev/i2c-10").unwrap();
     println!("right front started");
+
+    // Distance sensors group 2
+    let mut back = VL53L0X::new("/dev/i2c-7").unwrap();
+    println!("back started");    
+    let mut leftback = VL53L0X::new("/dev/i2c-6").unwrap();
+    println!("left back started");
     let mut rightback = VL53L0X::new("/dev/i2c-9").unwrap();
     println!("right back started");
 
@@ -185,6 +188,7 @@ fn do_canyon(context: &mut Context) {
 
     let mut distance: u16 = 0;
     let mut direction = "Front";
+    let mut prev_dir = "None";
     let mut state = 1;
 
     let original = compass.read_degrees().unwrap();
@@ -201,7 +205,19 @@ fn do_canyon(context: &mut Context) {
     control.set_gear(gear);
     control.set_bias(0);
 
-    println!("Press start");
+    context.pixel.all_on();
+    context.pixel.render();
+
+    context.display.clear();
+    context
+        .display
+        .draw_text(4, 4, "Press start...", WHITE)
+        .unwrap();
+    context.display.update_all().unwrap();
+    
+    let mut current_colour = NONE;
+    let mut previous_colour = NONE;
+    
     while !quit {
         while let Some(event) = context.gilrs.next_event() {
             match event {
@@ -210,12 +226,14 @@ fn do_canyon(context: &mut Context) {
                     event: EventType::ButtonPressed(Button::Start, _),
                     ..
                 } => {
-                    println!("Start pressed");
                     // Start button -> running
                     context.pixel.all_off();
+                    context.pixel.render();
+                    
+                    context.display.clear();
                     context
                         .display
-                        .draw_text(4, 4, "              ", WHITE)
+                        .draw_text(4, 4, "Running       ", WHITE)
                         .unwrap();
                     context.display.update().unwrap();
                     running = true;
@@ -230,21 +248,21 @@ fn do_canyon(context: &mut Context) {
                     quit = true;
                     break;
                 }
-                _ => (),
+                _ => (),                
             };
         }
 
         if running {
             let heading = compass.read_degrees().unwrap();
 
-            let diff = ((heading - original) * 50.0) as i32;
+            let diff = ((heading - original) * 30.0) as i32;
 
-            let front_dist = front.read().unwrap();
-            let front_right_dist = rightfront.read().unwrap();
-            let back_right_dist = rightback.read().unwrap();
-            let front_left_dist = leftfront.read().unwrap();
-            let back_left_dist = leftback.read().unwrap();
-            let back_dist = back.read().unwrap();
+            let front_dist = front.read();
+            let front_right_dist = rightfront.read();
+            //let back_right_dist = rightback.read();
+            let front_left_dist = leftfront.read();
+            //let back_left_dist = leftback.read();
+            let back_dist = back.read();
 
             if state == 1 {
                 distance = front_right_dist;
@@ -307,36 +325,68 @@ fn do_canyon(context: &mut Context) {
                 break;
             }
 
-            println!(
-                "State {:?}, Direction {:#?}, Distance {:#?}mm  Heading {:#?}°  Diff {:#?}     ",
-                state, direction, distance, heading, diff
-            );
+            if direction != prev_dir {
+                println!(
+                    "State {:?}, Direction {:#?}, Distance {:#?}mm  Heading {:#?}°  Diff {:#?}     ",
+                    state, direction, distance, heading, diff
+                );
+                prev_dir = direction;
+            }
 
             if direction == "Front" {
                 left_rear_speed = SPEED - diff;
                 right_rear_speed = SPEED * -1;
                 left_front_speed = SPEED - diff;
                 right_front_speed = SPEED * -1;
+                current_colour = GREEN;
             } else if direction == "Back" {
                 left_rear_speed = (SPEED + diff) * -1;
                 right_rear_speed = SPEED;
                 left_front_speed = (SPEED + diff) * -1;
                 right_front_speed = SPEED;
-            } else if direction == "Left" {
-                left_rear_speed = SPEED * -1;
-                right_rear_speed = SPEED;
-                left_front_speed = SPEED;
-                right_front_speed = SPEED * -1;
+                current_colour = RED;
             } else if direction == "Right" {
-                left_rear_speed = SPEED;
-                right_rear_speed = SPEED * -1;
-                left_front_speed = SPEED * -1;
-                right_front_speed = SPEED;
+                // Strafe Right                
+                left_front_speed = (SPEED  * -1);
+                left_rear_speed = SPEED + diff;
+                right_front_speed = (SPEED  * -1);
+                right_rear_speed = SPEED + diff;                
+                current_colour = PURPLE;
+            } else if direction == "Left" {
+                // Strafe Left
+                left_front_speed = SPEED + diff;
+                left_rear_speed = (SPEED  * -1);
+                right_front_speed = SPEED + diff;
+                right_rear_speed = (SPEED  * -1);
+                current_colour = CYAN;
             } else {
                 left_rear_speed = 0;
                 right_rear_speed = 0;
                 left_front_speed = 0;
                 right_front_speed = 0;
+                current_colour = NONE;
+            }
+            
+            if current_colour != previous_colour {
+                if current_colour == RED {
+                    context.pixel.red();
+                } else if current_colour == GREEN {
+                    context.pixel.green();
+                } else if current_colour == BLUE {
+                    context.pixel.blue();
+                } else if current_colour == YELLOW {
+                    context.pixel.yellow();
+                } else if current_colour == PURPLE {
+                    context.pixel.purple();
+                } else if current_colour == CYAN {
+                    context.pixel.cyan();                
+                } else if current_colour == ALL {
+                    context.pixel.white();                
+                } else if current_colour == NONE {
+                    context.pixel.all_off();
+                }
+                context.pixel.render();
+                previous_colour = current_colour;
             }
 
             control.speed(
@@ -347,6 +397,10 @@ fn do_canyon(context: &mut Context) {
             );
         }
     }
+
+    context.pixel.all_off();
+    context.pixel.render();
+                
     control.stop();
     context.display.clear();
 }
@@ -547,7 +601,7 @@ fn do_hubble(context: &mut Context, mut locations: [i32; 4]) {
             //}
             } else if activity == Activities::MoveTowards {
                 // May have to check if we are square to the target?
-                let dist = front.read().unwrap();
+                let dist = front.read();
                 println!("Distance = {:?}", dist);
                 if dist < 130 {
                     println!("At min distance");
@@ -561,7 +615,7 @@ fn do_hubble(context: &mut Context, mut locations: [i32; 4]) {
                     activity = Activities::MoveTowards;
                 }
             } else if activity == Activities::MoveAway {
-                let dist = front.read().unwrap();
+                let dist = front.read();
                 println!("Distance = {:?}", dist);
                 if dist > 600 {
                     println!("At max distance");
@@ -627,7 +681,7 @@ fn do_straight(context: &mut Context) {
                     println!("Select Pressed");
                     // Start button -> running
                     context.pixel.all_off();
-                    target = left.read().unwrap() as i32 - right.read().unwrap() as i32;
+                    target = left.read() as i32 - right.read() as i32;
                     context
                         .display
                         .draw_text(4, 4, "              ", WHITE)
@@ -656,8 +710,8 @@ fn do_straight(context: &mut Context) {
             let mut left_front_speed: i32 = 1000;
             let mut right_front_speed: i32 = -1000;
 
-            let right_dist: i32 = right.read().unwrap() as i32;
-            let left_dist: i32 = left.read().unwrap() as i32;
+            let right_dist: i32 = right.read() as i32;
+            let left_dist: i32 = left.read() as i32;
 
             println!("Right {:#?}mm, Left {:#?}mm ", right_dist, left_dist);
 
@@ -708,9 +762,9 @@ fn do_straight(context: &mut Context) {
     thread::sleep(interval);
 }
 
-
 fn do_wheels_rc(context: &mut Context) {
-   
+    const DEADZONE: i32 = 50;
+    
     let mut control = build_control();
     control.init();
 
@@ -720,7 +774,7 @@ fn do_wheels_rc(context: &mut Context) {
     let mut quit = false;
     let mut left_stick_y = 0;
     let mut right_stick_y = 0;
-    
+
     let mut current_colour = NONE;
     let mut previous_colour = NONE;
 
@@ -830,25 +884,40 @@ fn do_wheels_rc(context: &mut Context) {
             let mut left_front_speed: i32;
             let mut right_front_speed: i32;
 
-            if left_stick_y == 0 && right_stick_y == 0 {
+            if left_stick_y > DEADZONE && right_stick_y > DEADZONE {
+                // Forward
+                left_front_speed = left_stick_y;
+                left_rear_speed = left_stick_y;
+                right_front_speed = -right_stick_y;
+                right_rear_speed = -right_stick_y;
+                current_colour = GREEN;
+            } else if left_stick_y < -DEADZONE && right_stick_y < -DEADZONE {
+                // Backwards
+                left_front_speed = left_stick_y;
+                left_rear_speed = left_stick_y;
+                right_front_speed = -right_stick_y;
+                right_rear_speed = -right_stick_y;
+                current_colour = RED;
+            } else if left_stick_y > DEADZONE && right_stick_y < -DEADZONE {
+                // Turn Right
+                left_front_speed = left_stick_y;
+                left_rear_speed = left_stick_y;
+                right_front_speed = -right_stick_y;
+                right_rear_speed = -right_stick_y;
+                current_colour = YELLOW;
+            } else if left_stick_y < -DEADZONE && right_stick_y > DEADZONE {
+                // Turn Left
+                left_front_speed = left_stick_y;
+                left_rear_speed = left_stick_y;
+                right_front_speed = -right_stick_y;
+                right_rear_speed = -right_stick_y;
+                current_colour = BLUE;
+            }  else {
                 left_rear_speed = 0;
                 right_rear_speed = 0;
                 left_front_speed = 0;
                 right_front_speed = 0;
                 current_colour = NONE;
-            } else {
-                left_front_speed = left_stick_y;
-                left_rear_speed = left_stick_y;
-                right_front_speed = -right_stick_y;
-                right_rear_speed = -right_stick_y;
-
-                if left_stick_y > 10 || right_stick_y > 10 {
-                    current_colour = GREEN;
-                } else if left_stick_y < -10 || right_stick_y < -10 {
-                    current_colour = RED;
-                } else {
-                    current_colour = NONE;
-                }
             }
 
             left_front_speed = left_front_speed / gear;
@@ -866,19 +935,28 @@ fn do_wheels_rc(context: &mut Context) {
                     left_rear_speed, right_rear_speed, left_front_speed, right_front_speed
                 );
             }
-            
+
             if current_colour != previous_colour {
                 if current_colour == RED {
-                    context.pixel.red();                    
+                    context.pixel.red();
                 } else if current_colour == GREEN {
-                    context.pixel.green();                    
-                }  else if current_colour == NONE {
-                    context.pixel.all_off();                    
+                    context.pixel.green();
+                } else if current_colour == BLUE {
+                    context.pixel.blue();
+                } else if current_colour == YELLOW {
+                    context.pixel.yellow();
+                } else if current_colour == PURPLE {
+                    context.pixel.purple();
+                } else if current_colour == CYAN {
+                    context.pixel.cyan();                
+                } else if current_colour == ALL {
+                    context.pixel.white();                
+                } else if current_colour == NONE {
+                    context.pixel.all_off();
                 }
                 context.pixel.render();
                 previous_colour = current_colour;
             }
-
             control.speed(
                 left_rear_speed,
                 right_rear_speed,
@@ -893,21 +971,21 @@ fn do_wheels_rc(context: &mut Context) {
 }
 
 fn do_mecanum_rc(context: &mut Context) {
-    const DEADZONE: i32 = 10;
+    const DEADZONE: i32 = 200;
 
     let mut control = build_control();
     control.init();
 
     let servo = build_servo(21);
 
-    let mut gear = 2;
+    let mut gear = 3;
     control.set_gear(gear);
 
     let mut left_stick_x = 0;
     let mut left_stick_y = 0;
     let mut right_stick_y = 0;
     let mut right_stick_x = 0;
-    
+
     let mut current_colour = NONE;
     let mut previous_colour = NONE;
 
@@ -1035,73 +1113,56 @@ fn do_mecanum_rc(context: &mut Context) {
             let mut left_front_speed: i32;
             let mut right_front_speed: i32;
 
-            left_rear_speed = 0;
-            right_rear_speed = 0;
-            left_front_speed = 0;
-            right_front_speed = 0;
-
-            if (left_stick_y > DEADZONE || left_stick_y < -DEADZONE)
-                || (right_stick_y > DEADZONE || right_stick_y < -DEADZONE)
-            {
-                //left_front_speed  = -left_stick_x + left_stick_y - right_stick_x;
-                //left_rear_speed   = left_stick_x + left_stick_y - right_stick_x;
-                //right_rear_speed  = -left_stick_x - left_stick_y + right_stick_x;
-                //right_front_speed = left_stick_x - left_stick_y + right_stick_x;
-                if left_stick_x < DEADZONE && left_stick_x > -DEADZONE {
-                    left_front_speed = left_stick_y;
-                    left_rear_speed = left_stick_y;
-                    right_front_speed = -right_stick_y;
-                    right_rear_speed = -right_stick_y;
-                } else {
-                    left_front_speed = left_stick_y - right_stick_x;
-                    left_rear_speed = left_stick_y - right_stick_x;
-                    right_rear_speed = left_stick_y + right_stick_x;
-                    right_front_speed = left_stick_y + right_stick_x;
-                }if current_colour != previous_colour {
-                if current_colour == RED {
-                    context.pixel.right_red();
-                    context.pixel.render();
-                } else if current_colour == GREEN {
-                    context.pixel.right_green();
-                    context.pixel.render();
-                }  else if current_colour == NONE {
-                    context.pixel.all_off();
-                    context.pixel.render();
-                }
-                previous_colour = current_colour;
-            }
-            }
-            if (left_stick_x > DEADZONE || left_stick_x < -DEADZONE)
-                && (left_stick_y < DEADZONE && left_stick_y > -DEADZONE)
-                && (right_stick_y < DEADZONE && right_stick_y > -DEADZONE)
-            {
-                // go sideways -
-                // left = front forward, rear backwards
-                // right = front backward, rear forwards
-                if left_stick_x > 0 {
-                    println!("going right");
-                    current_colour = RED;
-                    
-                } else {
-                    println!("going left");
-                    current_colour = GREEN;
-                }
-                // if x > 0, front will be negative, rear will be positive - right
-                // if x < 0, front will be positive, rear will be negative - left
-                // however, right is flipped round!
+            if left_stick_y > DEADZONE && right_stick_y > DEADZONE {
+                // Forward
+                left_front_speed = left_stick_y;
+                left_rear_speed = left_stick_y;
+                right_front_speed = -right_stick_y;
+                right_rear_speed = -right_stick_y;
+                current_colour = GREEN;
+            } else if left_stick_y < -DEADZONE && right_stick_y < -DEADZONE {
+                // Backwards
+                left_front_speed = left_stick_y;
+                left_rear_speed = left_stick_y;
+                right_front_speed = -right_stick_y;
+                right_rear_speed = -right_stick_y;
+                current_colour = RED;
+            } else if left_stick_y > DEADZONE && right_stick_y < -DEADZONE {
+                // Turn Right
+                left_front_speed = left_stick_y;
+                left_rear_speed = left_stick_y;
+                right_front_speed = -right_stick_y;
+                right_rear_speed = -right_stick_y;
+                current_colour = YELLOW;
+            } else if left_stick_y < -DEADZONE && right_stick_y > DEADZONE {
+                // Turn Left
+                left_front_speed = left_stick_y;
+                left_rear_speed = left_stick_y;
+                right_front_speed = -right_stick_y;
+                right_rear_speed = -right_stick_y;
+                current_colour = BLUE;
+            } else if left_stick_x < -DEADZONE && right_stick_x < -DEADZONE {
+                // Strafe left
                 left_front_speed = -left_stick_x;
-                right_front_speed = left_stick_x;
                 left_rear_speed = left_stick_x;
-                right_rear_speed = -left_stick_x;
+                right_front_speed = -right_stick_x;
+                right_rear_speed = right_stick_x;
+                current_colour = PURPLE;
+            } else if left_stick_x > DEADZONE && right_stick_x > DEADZONE {
+                // Strafe Right
+                left_front_speed = -left_stick_x;
+                left_rear_speed = left_stick_x;
+                right_front_speed = -right_stick_x;
+                right_rear_speed = right_stick_x;
+                current_colour = CYAN;
             } else {
-                if left_stick_y > 10 || right_stick_y > 10 {
-                    current_colour = GREEN;
-                } else if left_stick_y < -10 || right_stick_y < -10 {
-                    current_colour = RED;
-                } else {
-                    current_colour = NONE;
-                }
+                left_rear_speed = 0;
+                right_rear_speed = 0;
+                left_front_speed = 0;
+                right_front_speed = 0;
+                current_colour = NONE;
             }
+            
 
             if left_rear_speed != 0
                 || right_rear_speed != 0
@@ -1109,23 +1170,38 @@ fn do_mecanum_rc(context: &mut Context) {
                 || right_front_speed != 0
             {
                 println!(
+                    "Stick left XY: {0},{1}   right X:Y {2},{3}",
+                    left_stick_x, left_stick_y, right_stick_x, right_stick_y
+                );
+                println!(
                     "Speed left rear: {0}, right rear: {1}, left front: {2} right front: {3}",
                     left_rear_speed, right_rear_speed, left_front_speed, right_front_speed
                 );
             }
-            
+
             if current_colour != previous_colour {
                 if current_colour == RED {
-                    context.pixel.red();                    
+                    context.pixel.red();
                 } else if current_colour == GREEN {
-                    context.pixel.green();                    
-                }  else if current_colour == NONE {
-                    context.pixel.all_off();                   
+                    context.pixel.green();
+                } else if current_colour == BLUE {
+                    context.pixel.blue();
+                } else if current_colour == YELLOW {
+                    context.pixel.yellow();
+                } else if current_colour == PURPLE {
+                    context.pixel.purple();
+                } else if current_colour == CYAN {
+                    context.pixel.cyan();                
+                } else if current_colour == ALL {
+                    context.pixel.white();                
+                } else if current_colour == NONE {
+                    context.pixel.all_off();
                 }
                 context.pixel.render();
                 previous_colour = current_colour;
             }
 
+            control.set_gear(gear);
             control.speed(
                 left_rear_speed,
                 right_rear_speed,
@@ -1141,10 +1217,9 @@ fn do_mecanum_rc(context: &mut Context) {
 }
 
 fn try_open_tof(filename: &'static str) -> Option<VL53L0X> {
-        
-    let front = match VL53L0X::new(filename) {        
+    let front = match VL53L0X::new(filename) {
         Ok(front) => front,
-        Err(e) => {            
+        Err(e) => {
             println!("Failed to open front TOF {:?} ", e);
             return None;
         }
@@ -1153,13 +1228,13 @@ fn try_open_tof(filename: &'static str) -> Option<VL53L0X> {
     return Some(front);
 }
 
-fn get_distance( tof:  &mut Option<VL53L0X>) -> u16 {
+fn get_distance(tof: &mut Option<VL53L0X>) -> u16 {
     let dist: u16;
     match tof {
         None => dist = 0,
         Some(ref mut tof) => {
-            dist = tof.read().unwrap();
-        },
+            dist = tof.read();
+        }
     }
     return dist;
 }
@@ -1169,28 +1244,25 @@ fn do_run_tests(context: &mut Context) {
     let mut compass = HMC5883L::new("/dev/i2c-1").unwrap();
     println!("Compass started");
 
-
     // Test distance sensors group 1 (not always present)
-    //let mut front = try_open_tof("/dev/i2c-8");
-    //let mut leftfront = try_open_tof("/dev/i2c-5");
-    //let mut rightfront = try_open_tof("/dev/i2c-10");
-    
+    let mut front = try_open_tof("/dev/i2c-8");
+    let mut leftfront = try_open_tof("/dev/i2c-5");
+    let mut rightfront = try_open_tof("/dev/i2c-10");
+
     // Test distance sensors group 2
-    let mut leftback = VL53L0X::new("/dev/i2c-6").unwrap();
-    println!("left back started");
-    let mut back = VL53L0X::new("/dev/i2c-7").unwrap();
-    println!("back started");
-    let mut rightback = VL53L0X::new("/dev/i2c-9").unwrap();
-    println!("right back started");
+    let mut back = try_open_tof("/dev/i2c-7");
+    let mut leftback = try_open_tof("/dev/i2c-6");
+    let mut rightback = try_open_tof("/dev/i2c-9");
 
     let mut heading = compass.read_degrees().unwrap();
-    let mut lb_dist = leftback.read().unwrap();    
-    let mut bk_dist = back.read().unwrap();    
-    let mut rb_dist = rightback.read().unwrap();    
     
-    //let mut ft_dist = get_distance(&mut front);    
-    //let mut lf_dist = get_distance(&mut leftfront);
-    //let mut rf_dist = get_distance(&mut rightfront);
+    let mut bk_dist = get_distance(&mut back);
+    let mut lb_dist = get_distance(&mut leftback);
+    let mut rb_dist = get_distance(&mut rightback);
+
+    let mut ft_dist = get_distance(&mut front);
+    let mut lf_dist = get_distance(&mut leftfront);
+    let mut rf_dist = get_distance(&mut rightfront);
 
     let mut colour = 0;
     context.pixel.red();
@@ -1204,20 +1276,29 @@ fn do_run_tests(context: &mut Context) {
         if Instant::now().duration_since(now) > interval {
             now = Instant::now();
             colour = colour + 1;
-            if colour > 4 {
-                colour = 0;
+            if colour > ALL {
+                colour = RED;
             }
-            if colour == 0 {
+            if colour == RED {
                 context.pixel.red();
                 context.pixel.render();
-            } else if colour == 1 {
+            } else if colour == GREEN {
                 context.pixel.green();
                 context.pixel.render();
-            } else if colour == 2 {
+            } else if colour == BLUE {
                 context.pixel.blue();
                 context.pixel.render();
-            } else if colour == 3 {
+            } else if colour == YELLOW {
                 context.pixel.yellow();
+                context.pixel.render();
+            } else if colour == PURPLE {
+                context.pixel.purple();
+                context.pixel.render();
+            } else if colour == CYAN {
+                context.pixel.cyan();
+                context.pixel.render();
+            } else if colour == ALL {
+                context.pixel.white();
                 context.pixel.render();
             }
         }
@@ -1230,7 +1311,7 @@ fn do_run_tests(context: &mut Context) {
                     event: EventType::ButtonPressed(Button::Mode, _),
                     ..
                 } => {
-                    println!("Mode Pressed");
+                    //println!("Mode Pressed");
                     quit = true;
                     break;
                 }
@@ -1239,17 +1320,16 @@ fn do_run_tests(context: &mut Context) {
                     event: EventType::ButtonPressed(Button::North, _),
                     ..
                 } => {
-                    println!("North Pressed");
+                    //println!("North Pressed");
                     heading = compass.read_degrees().unwrap();
-                    lb_dist = leftback.read().unwrap();                    
-                    bk_dist = back.read().unwrap();
-                    rb_dist = rightback.read().unwrap();                    
-                    
-                    //ft_dist = get_distance(&mut front);    
-                    //lf_dist = get_distance(&mut leftfront);
-                    //rf_dist = get_distance(&mut rightfront);
-                    
-                                    
+                    bk_dist = get_distance(&mut back);
+                    lb_dist = get_distance(&mut leftback);
+                    rb_dist = get_distance(&mut rightback);
+
+                    ft_dist = get_distance(&mut front);
+                    lf_dist = get_distance(&mut leftfront);
+                    rf_dist = get_distance(&mut rightfront);
+
                     context.display.clear();
                     context
                         .display
@@ -1268,28 +1348,28 @@ fn do_run_tests(context: &mut Context) {
                     context
                         .display
                         .draw_text(56, 24, &format!("{:5.2} ", rb_dist), WHITE)
-                        .unwrap();                    
+                        .unwrap();
                     context.display.draw_text(0, 40, "Back:", WHITE).unwrap();
                     context
                         .display
                         .draw_text(56, 40, &format!("{:5.2} ", bk_dist), WHITE)
-                        .unwrap();                                        
-                    
-                    //context.display.draw_text(0, 32, "Front:", WHITE).unwrap();
-                    //context
-                        //.display
-                        //.draw_text(56, 32, &format!("{:5.2} ", ft_dist), WHITE)
-                        //.unwrap();
-                    //context.display.draw_text(0, 48, "LF:", WHITE).unwrap();
-                    //context
-                        //.display
-                        //.draw_text(56, 48, &format!("{:5.2} ", lf_dist), WHITE)
-                        //.unwrap();
-                    //context.display.draw_text(0, 56, "RF:", WHITE).unwrap();
-                    //context
-                        //.display
-                        //.draw_text(56, 56, &format!("{:5.2} ", rf_dist), WHITE)
-                        //.unwrap();
+                        .unwrap();
+
+                    context.display.draw_text(0, 32, "Front:", WHITE).unwrap();
+                    context
+                        .display
+                        .draw_text(56, 32, &format!("{:5.2} ", ft_dist), WHITE)
+                        .unwrap();
+                    context.display.draw_text(0, 48, "LF:", WHITE).unwrap();
+                    context
+                        .display
+                        .draw_text(56, 48, &format!("{:5.2} ", lf_dist), WHITE)
+                        .unwrap();
+                    context.display.draw_text(0, 56, "RF:", WHITE).unwrap();
+                    context
+                        .display
+                        .draw_text(56, 56, &format!("{:5.2} ", rf_dist), WHITE)
+                        .unwrap();
                     context.display.update().unwrap();
                     break;
                 }

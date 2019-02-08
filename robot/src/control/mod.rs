@@ -97,7 +97,7 @@ pub fn build_control() -> Control {
 
     let left_front_motor = build_motor(15, 22);
 
-    let right_front_motor = build_motor(14, 27);
+    let right_front_motor = build_motor(27, 14);  // was 14, 27
 
     let bias = 0;
 
