@@ -83,7 +83,7 @@ impl Camera {
             &frame,
             core::Rect {
                 x: 0,
-                y: 200,
+                y: 0,
                 width: 640,
                 height: 80
             }
@@ -333,33 +333,41 @@ pub fn build_camera() -> Camera {
     let yellow = 2;
     let green = 3;
     let colours = [red, blue, yellow, green];
-
+    
     let red_lower = core::Scalar {
-        data: [58f64, 167f64, 107f64, -1f64],
+        //data: [58f64, 167f64, 107f64, -1f64],
+        data: [121f64, 128f64, 50f64, -1f64],
     };
     let red_upper = core::Scalar {
-        data: [98f64, 207f64, 147f64, -1f64],
+        //data: [199f64, 255f64, 158f64, -1f64],
+        data: [188f64, 228f64, 128f64, -1f64],
     };
 
     let blue_lower = core::Scalar {
-        data: [49f64, 80f64, 180f64, -1f64],
+        //data: [49f64, 80f64, 180f64, -1f64],
+        data: [203f64, 40f64, 136f64, -1f64],
     };
     let blue_upper = core::Scalar {
-        data: [89f64, 120f64, 220f64, -1f64],
+        //data: [89f64, 120f64, 220f64, -1f64],
+        data: [251f64, 94f64, 191f64, -1f64],
     };
 
     let yellow_lower = core::Scalar {
-        data: [121f64, 142f64, 68f64, -1f64],
+        //data: [121f64, 142f64, 68f64, -1f64],
+        data: [237f64, 116f64, 128f64, -1f64],
     };
     let yellow_upper = core::Scalar {
-        data: [161f64, 182f64, 108f64, -1f64],
+        //data: [161f64, 182f64, 108f64, -1f64],
+        data: [255f64, 157f64, 163f64, -1f64],
     };
 
     let green_lower = core::Scalar {
-        data: [124f64, 71f64, 83f64, -1f64],
+        //data: [124f64, 71f64, 83f64, -1f64],
+        data: [197f64, 102f64, 97f64, -1f64],
     };
     let green_upper = core::Scalar {
-        data: [164f64, 111f64, 123f64, -1f64],
+        //data: [164f64, 111f64, 123f64, -1f64],
+        data: [243f64, 135f64, 143f64, -1f64],
     };
 
     Camera {

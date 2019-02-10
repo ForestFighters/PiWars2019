@@ -427,6 +427,74 @@ fn print_colour(colour: i32) {
 
 fn do_hubble(context: &mut Context, mut locations: [i32; 4]) {
     context.pixel.all_on();
+    let mut control = build_control();
+    control.init();
+    
+    let mut cam = build_camera();
+
+    let mut front = VL53L0X::new("/dev/i2c-8").unwrap();
+
+    context.display.clear();
+    context
+        .display
+        .draw_text(4, 4, "Press Left(E)...", WHITE)
+        .unwrap();
+    context.display.update_all().unwrap();
+    
+    let mut gear = 4;
+    control.set_gear(gear);
+    control.set_bias(0);
+    
+    let mut running = false;
+    let mut quit = false;
+    while !quit {
+        while let Some(event) = context.gilrs.next_event() {
+            match event {
+                Event {
+                    id: _,
+                    event: EventType::ButtonPressed(Button::East, _),
+                    ..
+                } => {
+                    println!("East Pressed");
+                    // Start button -> running
+                    context.pixel.all_off();
+                    context
+                        .display
+                        .draw_text(4, 4, "              ", WHITE)
+                        .unwrap();
+                    context.display.update().unwrap();
+                    running = true;
+                }
+                // Needs gear changing here
+                Event {
+                    id: _,
+                    event: EventType::ButtonPressed(Button::Mode, _),
+                    ..
+                } => {
+                    println!("Mode");
+                    // Mode to exit
+                    quit = true;
+                    break;
+                }
+                _ => (),
+            };
+        }
+        
+        // Main State running or not, first time through && locations[0] == NONE
+        if running {
+            control.turn_left(TURNING_SPEED, gear);
+            let colour = cam.get_colour(false);
+            print_colour(colour);
+        }
+    }
+
+    control.stop();
+    context.display.clear();
+    context.pixel.all_off();
+}
+    
+fn _do_hubble(context: &mut Context, mut locations: [i32; 4]) {
+    context.pixel.all_on();
 
     let mut control = build_control();
     control.init();
@@ -456,7 +524,7 @@ fn do_hubble(context: &mut Context, mut locations: [i32; 4]) {
     let mut activity = Activities::Waiting;
 
     let mut current = 0;
-    let mut gear = 3;
+    let mut gear = 4;
     control.set_gear(gear);
     control.set_bias(0);
 
@@ -899,13 +967,27 @@ fn do_wheels_rc(context: &mut Context) {
                 right_rear_speed = -right_stick_y;
                 current_colour = RED;
             } else if left_stick_y > DEADZONE && right_stick_y < -DEADZONE {
-                // Turn Right
+                // Turn Sharp Right
                 left_front_speed = left_stick_y;
                 left_rear_speed = left_stick_y;
                 right_front_speed = -right_stick_y;
                 right_rear_speed = -right_stick_y;
                 current_colour = YELLOW;
             } else if left_stick_y < -DEADZONE && right_stick_y > DEADZONE {
+                // Turn Sharp Left
+                left_front_speed = left_stick_y;
+                left_rear_speed = left_stick_y;
+                right_front_speed = -right_stick_y;
+                right_rear_speed = -right_stick_y;
+                current_colour = BLUE;
+            } else if left_stick_y > DEADZONE && right_stick_y == 0 {
+                // Turn Right
+                left_front_speed = left_stick_y;
+                left_rear_speed = left_stick_y;
+                right_front_speed = -right_stick_y;
+                right_rear_speed = -right_stick_y;
+                current_colour = YELLOW;
+            } else if left_stick_y == 0 && right_stick_y > DEADZONE {
                 // Turn Left
                 left_front_speed = left_stick_y;
                 left_rear_speed = left_stick_y;

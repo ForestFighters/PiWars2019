@@ -77,7 +77,7 @@ fn get_colour(mut frame: core::Mat) -> Result<i32,String> {
 	println!("Now {:#?}",Instant::now().duration_since(now));
 	
 	//let mut frame2 = try!(core::Mat::clone( &frame ) );
-	let mut frame2 = try!(core::Mat::rect( &frame, core::Rect{x:0,y:200,width:640,height:80}) );
+	let mut frame2 = try!(core::Mat::rect( &frame, core::Rect{x:0,y:0,width:640,height:80}) );
 					
 	let mut img_hsv = try!(core::Mat::new());
 	try!(imgproc::cvt_color(&mut frame, &mut img_hsv, imgproc::COLOR_BGR2HSV, 0));
