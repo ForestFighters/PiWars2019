@@ -535,7 +535,6 @@ fn calc_target( heading: f32, offset: f32 ) -> f32 {
  }  
     
     
-    
 fn _do_hubble(context: &mut Context, mut locations: [i32; 4]) {
     context.pixel.all_on();
 
@@ -762,7 +761,7 @@ fn do_straight(context: &mut Context) {
 
     let mut control = build_control();
     control.init();
-    control.set_gear(3);
+    control.set_gear(2);
 
     let mut left = VL53L0X::new("/dev/i2c-5").unwrap();
     let mut right = VL53L0X::new("/dev/i2c-10").unwrap();
@@ -824,28 +823,28 @@ fn do_straight(context: &mut Context) {
             let right_dist: i32 = right.read() as i32;
             let left_dist: i32 = left.read() as i32;
 
-            println!("Right {:#?}mm, Left {:#?}mm ", right_dist, left_dist);
+            println!("Target {:#?}mm, Right {:#?}mm, Left {:#?}mm ", target, right_dist, left_dist);
 
-            let difference: i32 = (target - (left_dist - right_dist)) * 3;
+            let difference: i32 = (target - (left_dist - right_dist)) * 5;
 
             if difference > 15 {
                 // turn right
                 context.pixel.right_red();
                 context.pixel.render();
                 println!("Turn Right {:04}  ", difference);
-                left_front_speed = left_front_speed + difference;
-                left_rear_speed = left_rear_speed  + difference;
-                right_front_speed = right_front_speed;
-                right_rear_speed = right_rear_speed;
+                left_front_speed = left_front_speed; //+ difference;
+                left_rear_speed = left_rear_speed;  //+ difference;
+                right_front_speed = right_front_speed + difference;
+                right_rear_speed = right_rear_speed  + difference;
             } else if difference < -15 {
                 // turn left
                 context.pixel.left_red();
                 context.pixel.render();
                 println!("Turn Left  {:04}  ", -difference);
-                left_front_speed = left_front_speed;
-                left_rear_speed = left_rear_speed;
-                right_front_speed = right_front_speed  + difference;
-                right_rear_speed = right_rear_speed + difference;
+                left_front_speed = left_front_speed + difference;
+                left_rear_speed = left_rear_speed + difference;
+                right_front_speed = right_front_speed; //+ difference;
+                right_rear_speed = right_rear_speed; //+ difference;
             } else {
                 //println!("Straight");
                 context.pixel.all_off();
@@ -854,7 +853,7 @@ fn do_straight(context: &mut Context) {
 
             {
                 //if left_rear_speed != 0 || right_rear_speed != 0 || left_front_speed != 0 || right_front_speed != 0  {
-                //println!(" {0}, {1}, {2}, {3} ", left_rear_speed, right_rear_speed, left_front_speed, right_front_speed );
+                    //println!(" {0}, {1}, {2}, {3} ", left_rear_speed, right_rear_speed, left_front_speed, right_front_speed );
                 //}
             }
             control.speed(
