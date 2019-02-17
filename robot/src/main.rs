@@ -10,6 +10,7 @@ use rust_pigpio::*;
 use std::time::Duration;
 use std::time::Instant;
 use std::{thread, time};
+use std::process::Command;
 
 use gilrs::Axis::{DPadX, DPadY, LeftStickX, LeftStickY, LeftZ, RightStickX, RightStickY, RightZ};
 use gilrs::{Button, Event, EventType, Gilrs};
@@ -52,7 +53,7 @@ const CYAN: i32 = 5;
 const ALL: i32 = 6;
 
 
-const TURNING_SPEED: i32 = 700;
+const TURNING_SPEED: i32 = 600;
 const DRIVING_SPEED: i32 = 600;
 
 fn _test() {
@@ -102,7 +103,7 @@ fn _test2() {
 
     loop {
         let colour = cam.get_colour(true);
-        print_colour(colour);
+        //print_colour(colour);
     }
 }
 
@@ -405,22 +406,32 @@ fn do_canyon(context: &mut Context) {
     context.display.clear();
 }
 
-fn print_colour(colour: i32) {
+fn print_colour(context: &mut Context, colour: i32) {
     match colour {
         RED => {
             println!("Found Red!");
+            context.pixel.red();
+            context.pixel.render();
         }
         BLUE => {
             println!("Found Blue!");
+            context.pixel.blue();
+            context.pixel.render();
         }
         YELLOW => {
             println!("Found Yellow!");
+            context.pixel.yellow();
+            context.pixel.render();
         }
         GREEN => {
             println!("Found Green!");
+            context.pixel.green();
+            context.pixel.render();
         }
         _ => {
             println!("Found Unknown");
+            context.pixel.all_off();
+            context.pixel.render();
         }
     }
 }
@@ -431,6 +442,8 @@ fn do_hubble(context: &mut Context, mut locations: [i32; 4]) {
     control.init();
     
     let mut cam = build_camera();
+    
+    let mut compass = HMC5883L::new("/dev/i2c-1").unwrap();
 
     let mut front = VL53L0X::new("/dev/i2c-8").unwrap();
 
@@ -447,6 +460,9 @@ fn do_hubble(context: &mut Context, mut locations: [i32; 4]) {
     
     let mut running = false;
     let mut quit = false;
+    
+    let mut heading = compass.read_degrees().unwrap();
+    let mut target = compass.read_degrees().unwrap();
     while !quit {
         while let Some(event) = context.gilrs.next_event() {
             match event {
@@ -463,6 +479,11 @@ fn do_hubble(context: &mut Context, mut locations: [i32; 4]) {
                         .draw_text(4, 4, "              ", WHITE)
                         .unwrap();
                     context.display.update().unwrap();
+                    heading = compass.read_degrees().unwrap();
+                    target = calc_target(heading, -46f32);
+                    println!("Init Heading {}", heading);
+                    println!("Init Target {}", target);
+                    control.turn_left(TURNING_SPEED, gear);
                     running = true;
                 }
                 // Needs gear changing here
@@ -482,9 +503,16 @@ fn do_hubble(context: &mut Context, mut locations: [i32; 4]) {
         
         // Main State running or not, first time through && locations[0] == NONE
         if running {
-            control.turn_left(TURNING_SPEED, gear);
-            let colour = cam.get_colour(false);
-            print_colour(colour);
+            heading = compass.read_degrees().unwrap();
+            println!("Heading {}", heading);
+            if heading < target {
+                control.stop();
+                thread::sleep(time::Duration::from_millis(2000));
+                let colour = cam.get_colour(false);
+                print_colour(context, colour);
+                target = calc_target(target, -91f32);
+                control.turn_left(TURNING_SPEED, gear);
+            }
         }
     }
 
@@ -492,6 +520,21 @@ fn do_hubble(context: &mut Context, mut locations: [i32; 4]) {
     context.display.clear();
     context.pixel.all_off();
 }
+
+fn calc_target( heading: f32, offset: f32 ) -> f32 {
+    
+    let mut target = heading + offset;
+    if target >= 360f32 {
+        target = target - 360f32;
+    } else if target < 0f32 {
+        // offset is -ve
+        target = 360f32 + (heading + offset);
+    }
+    println!("Target {}", target);
+    return target;
+ }  
+    
+    
     
 fn _do_hubble(context: &mut Context, mut locations: [i32; 4]) {
     context.pixel.all_on();
@@ -610,25 +653,25 @@ fn _do_hubble(context: &mut Context, mut locations: [i32; 4]) {
                 // Get the colour and store it away
                 let colour = cam.get_colour(false);
                 if colour == RED && !got_red {
-                    print_colour(colour);
+                    print_colour(context, colour);
                     locations[pos] = RED;
                     pos += 1;
                     got_red = true;
                 }
                 if colour == BLUE && !got_blue {
-                    print_colour(colour);
+                    print_colour(context, colour);
                     locations[pos] = BLUE;
                     pos += 1;
                     got_blue = true;
                 }
                 if colour == YELLOW && !got_yellow {
                     locations[pos] = YELLOW;
-                    print_colour(colour);
+                    print_colour(context, colour);
                     pos += 1;
                     got_yellow = true;
                 }
                 if colour == GREEN && !got_green {
-                    print_colour(colour);
+                    print_colour(context, colour);
                     locations[pos] = GREEN;
                     pos += 1;
                     got_green = true;
@@ -719,7 +762,7 @@ fn do_straight(context: &mut Context) {
 
     let mut control = build_control();
     control.init();
-    control.set_gear(1);
+    control.set_gear(3);
 
     let mut left = VL53L0X::new("/dev/i2c-5").unwrap();
     let mut right = VL53L0X::new("/dev/i2c-10").unwrap();
@@ -790,19 +833,19 @@ fn do_straight(context: &mut Context) {
                 context.pixel.right_red();
                 context.pixel.render();
                 println!("Turn Right {:04}  ", difference);
-                left_front_speed = left_front_speed;
-                left_rear_speed = left_rear_speed;
-                right_front_speed = right_front_speed + difference;
-                right_rear_speed = right_rear_speed + difference;
+                left_front_speed = left_front_speed + difference;
+                left_rear_speed = left_rear_speed  + difference;
+                right_front_speed = right_front_speed;
+                right_rear_speed = right_rear_speed;
             } else if difference < -15 {
                 // turn left
                 context.pixel.left_red();
                 context.pixel.render();
                 println!("Turn Left  {:04}  ", -difference);
-                left_front_speed = left_front_speed + difference;
-                left_rear_speed = left_rear_speed + difference;
-                right_front_speed = right_front_speed;
-                right_rear_speed = right_rear_speed;
+                left_front_speed = left_front_speed;
+                left_rear_speed = left_rear_speed;
+                right_front_speed = right_front_speed  + difference;
+                right_rear_speed = right_rear_speed + difference;
             } else {
                 //println!("Straight");
                 context.pixel.all_off();
@@ -1691,6 +1734,9 @@ fn main() {
                             .draw_text(4, 4, "Shutdown...", LT_GREY)
                             .unwrap();
                         context.display.update_all().unwrap();
+                        Command::new("halt")
+                            .spawn()
+                            .expect("halt command failed");
                         quit = true;
                         break;
                     }
