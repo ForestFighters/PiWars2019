@@ -39,7 +39,7 @@ impl Control {
     }
 
     pub fn speed(
-        &self,
+        &mut self,
         left_rear_speed: i32,
         right_rear_speed: i32,
         left_front_speed: i32,

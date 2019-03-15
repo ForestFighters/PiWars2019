@@ -3,6 +3,10 @@ extern crate gilrs;
 extern crate i2cdev;
 extern crate image;
 extern crate rust_pigpio;
+extern crate serde;
+extern crate serde_json;
+extern crate csv;
+
 
 extern crate robot;
 
@@ -11,9 +15,15 @@ use std::time::Duration;
 use std::time::Instant;
 use std::{thread, time};
 use std::process::Command;
+use std::fs::{self, File};
+use std::str;
+use csv::StringRecord;
 
 use gilrs::Axis::{DPadX, DPadY, LeftStickX, LeftStickY, LeftZ, RightStickX, RightStickY, RightZ};
 use gilrs::{Button, Event, EventType, Gilrs};
+
+use serde::{Deserialize, Serialize};
+use serde_json::Result;
 
 use robot::camera::*;
 use robot::context::*;
@@ -52,9 +62,27 @@ const PURPLE: i32 = 4;
 const CYAN: i32 = 5;
 const ALL: i32 = 6;
 
+const MINDIST: u16 = 250;
+const MAXDIST: u16 = 2000;
 
 const TURNING_SPEED: i32 = 600;
 const DRIVING_SPEED: i32 = 600;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Calibrate {
+    
+    pub red_lower: [f64; 4],
+    pub red_upper: [f64; 4],
+
+    pub green_lower: [f64; 4],
+    pub green_upper: [f64; 4],
+
+    pub blue_lower: [f64; 4],
+    pub blue_upper: [f64; 4],
+
+    pub yellow_lower: [f64; 4],
+    pub yellow_upper: [f64; 4],
+}
 
 fn _test() {
     // Test compass
@@ -161,29 +189,74 @@ fn _test5() {
     control.stop();
 }
 
-fn do_canyon(context: &mut Context) {
-    const SPEED: i32 = 700;
-    const MINDIST: u16 = 250;
-    const MAXDIST: u16 = 2000;
+fn get_deceleration(distance: u16) -> f64 {
+    if distance < MINDIST {
+        return 0.2;
+    }
+    let distance_togo = distance - MINDIST;
+	let mut decel = 1.0;
+	if distance_togo < 400 {
+		decel = ((distance_togo as f64)/400.0)/2.0;
+        if decel < 0.2 {
+            decel = 0.2;
+        }        
+	}
+    //println!("decel is: {:?}", decel);
+	return decel;
+}
 
+
+const SPEED: i32 = 250;
+const MULTI: f32 = 100.0;
+fn align(original: f32, compass: &mut HMC5883L, control: &mut Control, gear: i32) {    
+    
+    control.stop();
+    let mut heading = compass.read_degrees().unwrap();
+    let mut diff = ((heading - original) * MULTI) as i32;
+    while diff > 5 || diff < -5 {
+        heading = compass.read_degrees().unwrap();
+        diff = ((heading - original) * MULTI) as i32;
+        println!(
+                    "Heading {:#?}°:{:#?}°  Diff {:#?}",
+                     original, heading, diff
+                );
+        if diff < 0 {
+            control.turn_right( SPEED, 4);
+        } else {
+            control.turn_left( SPEED, 4);  
+        }
+    }
+    control.stop();
+}
+    
+fn do_canyon(context: &mut Context) {
+    
     let mut compass = HMC5883L::new("/dev/i2c-1").unwrap();
     
     // Distance sensors group 1
-    let mut front = VL53L0X::new("/dev/i2c-8").unwrap();
-    println!("front started");
-    let mut leftfront = VL53L0X::new("/dev/i2c-5").unwrap();
-    println!("left front started");
-    let mut rightfront = VL53L0X::new("/dev/i2c-10").unwrap();
+    let mut front = try_open_tof("/dev/i2c-8");
+    let mut leftfront = try_open_tof("/dev/i2c-5");
+    let mut rightfront = try_open_tof("/dev/i2c-10");    
+    println!("front started");    
+    println!("left front started");    
     println!("right front started");
 
     // Distance sensors group 2
-    let mut back = VL53L0X::new("/dev/i2c-7").unwrap();
-    println!("back started");    
-    let mut leftback = VL53L0X::new("/dev/i2c-6").unwrap();
+    let mut back = try_open_tof("/dev/i2c-7");
+    let mut leftback = try_open_tof("/dev/i2c-6");
+    let mut rightback = try_open_tof("/dev/i2c-9");
+    println!("back started");        
     println!("left back started");
-    let mut rightback = VL53L0X::new("/dev/i2c-9").unwrap();
     println!("right back started");
-
+    
+    
+    set_continous(&mut front);
+    set_continous(&mut leftfront);
+    set_continous(&mut rightfront);
+    set_continous(&mut back);
+    set_continous(&mut leftback);
+    set_continous(&mut rightback);    
+    
     let mut control = build_control();
     control.init();
 
@@ -191,8 +264,12 @@ fn do_canyon(context: &mut Context) {
     let mut direction = "Front";
     let mut prev_dir = "None";
     let mut state = 1;
-
+    let mut diff: i32 = 0;
+    
     let original = compass.read_degrees().unwrap();
+    let mut heading = compass.read_degrees().unwrap();    
+    
+    
 
     let mut left_rear_speed: i32;
     let mut right_rear_speed: i32;
@@ -202,9 +279,16 @@ fn do_canyon(context: &mut Context) {
     let mut quit = false;
     let mut running = false;
 
-    let mut gear = 5;
+    let mut gear = 1;
     control.set_gear(gear);
-    control.set_bias(0);
+    control.set_bias(50);
+    
+    let mut decel = 0.0;
+    
+    println!(
+        "Init Original {:#?}°,  Heading {:#?}° Diff {:#?} Decel {:?}",
+        original, heading, diff, decel
+    );
 
     context.pixel.all_on();
     context.pixel.render();
@@ -218,6 +302,8 @@ fn do_canyon(context: &mut Context) {
     
     let mut current_colour = NONE;
     let mut previous_colour = NONE;
+    
+    
     
     while !quit {
         while let Some(event) = context.gilrs.next_event() {
@@ -254,67 +340,90 @@ fn do_canyon(context: &mut Context) {
         }
 
         if running {
-            let heading = compass.read_degrees().unwrap();
+            heading = compass.read_degrees().unwrap();
 
-            let diff = ((heading - original) * 30.0) as i32;
+            let diff = ((heading - original) * MULTI) as i32;
+            //let diff: i32 = 0;
 
-            let front_dist = front.read();
-            let front_right_dist = rightfront.read();
+            //let front_dist = front.read();
+            //let front_right_dist = rightfront.read();
             //let back_right_dist = rightback.read();
-            let front_left_dist = leftfront.read();
+            //let front_left_dist = leftfront.read();
             //let back_left_dist = leftback.read();
-            let back_dist = back.read();
+            //let back_dist = back.read();
+            
+            let front_dist = get_distance(&mut front, true);
+            let front_right_dist = get_distance(&mut rightfront, true);
+            let front_left_dist = get_distance(&mut leftfront, true);
+            let back_dist = get_distance(&mut back, true);
 
             if state == 1 {
                 distance = front_right_dist;
+                decel = get_deceleration( distance );
                 if front_dist < MINDIST {
+                    align( original, &mut compass, &mut control, gear );
                     state = 2;
                     direction = "Left";
                     distance = front_dist;
+                    decel = get_deceleration( distance );
                 }
             }
 
             if state == 2 && front_left_dist < MINDIST {
                 // && front_dist < 150
+                align( original, &mut compass, &mut control, gear );
                 state = 3;
                 direction = "Back";
                 distance = front_left_dist;
+                decel = get_deceleration( distance );
             }
             if state == 3 && back_dist < MINDIST {
                 // && front_right_dist < 150 && front_left_dist > 750
+                align( original, &mut compass, &mut control, gear );
                 state = 4;
                 direction = "Left";
                 distance = back_dist;
+                decel = get_deceleration( distance );
             }
             if state == 4 && front_left_dist < MINDIST {
                 // && back_dist < 150 && front_right_dist > 750
+                align( original, &mut compass, &mut control, gear );
                 state = 5;
                 direction = "Front";
                 distance = front_left_dist;
+                decel = get_deceleration( distance );
             }
             if state == 5 && front_dist < MINDIST {
                 // && front_right_dist < 150 && front_left_dist > 750
+                align( original, &mut compass, &mut control, gear );
                 state = 6;
                 direction = "Left";
                 distance = front_dist;
+                decel = get_deceleration( distance );
             }
             if state == 6 && front_left_dist < MINDIST {
                 // && front_dist < 150 && front_right_dist > 750
+                align( original, &mut compass, &mut control, gear );
                 state = 7;
                 direction = "Back";
                 distance = front_left_dist;
+                decel = get_deceleration( distance );
             }
             if state == 7 && back_dist < MINDIST {
                 // && front_left_dist < 150 && front_dist > 750
+                align( original, &mut compass, &mut control, gear );
                 state = 8;
                 direction = "Right";
                 distance = back_dist;
+                decel = get_deceleration( distance );
             }
             if state == 8 && front_right_dist < MINDIST {
                 // && front_left_dist > 750 && front_dist > 750
+                align( original, &mut compass, &mut control, gear );
                 state = 9;
                 direction = "Back";
                 distance = front_right_dist;
+                decel = get_deceleration( distance );
             }
             if state == 9 && front_right_dist > MINDIST && front_dist > MAXDIST {
                 state = 10;
@@ -326,19 +435,19 @@ fn do_canyon(context: &mut Context) {
                 break;
             }
 
-            if direction != prev_dir {
+            //if direction != prev_dir {
                 println!(
-                    "State {:?}, Direction {:#?}, Distance {:#?}mm  Heading {:#?}°  Diff {:#?}     ",
-                    state, direction, distance, heading, diff
+                    "State {:?}, Dir {:#?}, Dist {:#?}mm  Heading {:#?}° Diff {:#?} Decel {:?}",
+                    state, direction, distance, heading, diff, decel
                 );
                 prev_dir = direction;
-            }
+            //}
 
             if direction == "Front" {
-                left_rear_speed = SPEED - diff;
-                right_rear_speed = SPEED * -1;
-                left_front_speed = SPEED - diff;
-                right_front_speed = SPEED * -1;
+                left_rear_speed = SPEED;
+                right_rear_speed = (SPEED + diff) * -1;
+                left_front_speed = SPEED;
+                right_front_speed = (SPEED + diff) * -1;
                 current_colour = GREEN;
             } else if direction == "Back" {
                 left_rear_speed = (SPEED + diff) * -1;
@@ -348,17 +457,17 @@ fn do_canyon(context: &mut Context) {
                 current_colour = RED;
             } else if direction == "Right" {
                 // Strafe Right                
-                left_front_speed = (SPEED  * -1);
-                left_rear_speed = SPEED + diff;
-                right_front_speed = (SPEED  * -1);
-                right_rear_speed = SPEED + diff;                
+                left_front_speed = SPEED  * -1;
+                left_rear_speed = SPEED; //+ diff;
+                right_front_speed = SPEED  * -1;
+                right_rear_speed = SPEED; //+ diff;                
                 current_colour = PURPLE;
             } else if direction == "Left" {
                 // Strafe Left
-                left_front_speed = SPEED + diff;
-                left_rear_speed = (SPEED  * -1);
-                right_front_speed = SPEED + diff;
-                right_rear_speed = (SPEED  * -1);
+                left_front_speed = SPEED; //+ diff;
+                left_rear_speed = SPEED  * -1;
+                right_front_speed = SPEED; // + diff;
+                right_rear_speed = SPEED  * -1;
                 current_colour = CYAN;
             } else {
                 left_rear_speed = 0;
@@ -367,6 +476,11 @@ fn do_canyon(context: &mut Context) {
                 right_front_speed = 0;
                 current_colour = NONE;
             }
+            
+            //left_rear_speed = ((left_rear_speed as f64) * decel) as i32;
+            //right_rear_speed = ((right_rear_speed as f64) * decel) as i32;
+            //left_front_speed = ((left_front_speed as f64) * decel) as i32;
+            //right_front_speed = ((right_front_speed as f64) * decel) as i32;
             
             if current_colour != previous_colour {
                 if current_colour == RED {
@@ -389,6 +503,11 @@ fn do_canyon(context: &mut Context) {
                 context.pixel.render();
                 previous_colour = current_colour;
             }
+            
+            println!(
+                    "Speeds lf {:?}, lr {:#?}, rf {:#?}, rr {:#?}",
+                    left_front_speed, left_rear_speed, right_front_speed, right_rear_speed
+                );
 
             control.speed(
                 left_rear_speed,
@@ -1347,23 +1466,49 @@ fn try_open_tof(filename: &'static str) -> Option<VL53L0X> {
             println!("Failed to open front TOF {:?} ", e);
             return None;
         }
-    };
+    };    
     println!("Success {:?}", filename);
     return Some(front);
 }
 
-fn get_distance(tof: &mut Option<VL53L0X>) -> u16 {
+fn get_distance(tof: &mut Option<VL53L0X>, continous: bool ) -> u16 {
     let dist: u16;
-    match tof {
-        None => dist = 0,
-        Some(ref mut tof) => {
-            dist = tof.read();
+    if continous {
+        match tof {
+            None => dist = 0,
+            Some(ref mut tof) => {
+                dist = tof.read_continous();
+            }
+        }
+    } 
+    else {
+        match tof {
+            None => dist = 0,
+            Some(ref mut tof) => {
+                dist = tof.read();
+            }
         }
     }
     return dist;
 }
 
+fn set_continous(tof: &mut Option<VL53L0X>) {    
+    match tof {
+        None => (),
+        Some(ref mut tof) => {
+            match tof.start_continuous() {
+                Ok(()) => { println!("Set continuous"); },
+                Err(e) => { println!("Failed to set continuous {:?}", e); }
+            }   
+        }
+    }    
+}
+
 fn do_run_tests(context: &mut Context) {
+    
+    let mut cam = build_camera();
+    load_calibration( &mut cam );
+     
     // Test compass
     let mut compass = HMC5883L::new("/dev/i2c-1").unwrap();
     println!("Compass started");
@@ -1372,7 +1517,7 @@ fn do_run_tests(context: &mut Context) {
     let mut front = try_open_tof("/dev/i2c-8");
     let mut leftfront = try_open_tof("/dev/i2c-5");
     let mut rightfront = try_open_tof("/dev/i2c-10");
-
+    
     // Test distance sensors group 2
     let mut back = try_open_tof("/dev/i2c-7");
     let mut leftback = try_open_tof("/dev/i2c-6");
@@ -1380,13 +1525,20 @@ fn do_run_tests(context: &mut Context) {
 
     let mut heading = compass.read_degrees().unwrap();
     
-    let mut bk_dist = get_distance(&mut back);
-    let mut lb_dist = get_distance(&mut leftback);
-    let mut rb_dist = get_distance(&mut rightback);
+    set_continous(&mut back);
+    set_continous(&mut leftback);
+    set_continous(&mut rightback);    
+    let mut bk_dist = get_distance(&mut back, true);
+    let mut lb_dist = get_distance(&mut leftback, true);
+    let mut rb_dist = get_distance(&mut rightback, true);
 
-    let mut ft_dist = get_distance(&mut front);
-    let mut lf_dist = get_distance(&mut leftfront);
-    let mut rf_dist = get_distance(&mut rightfront);
+    set_continous(&mut front);
+    let mut ft_dist = get_distance(&mut front, true);
+    
+    set_continous(&mut leftfront);
+    set_continous(&mut rightfront);
+    let mut lf_dist = get_distance(&mut leftfront, true);
+    let mut rf_dist = get_distance(&mut rightfront, true);
 
     let mut colour = 0;
     context.pixel.red();
@@ -1397,6 +1549,9 @@ fn do_run_tests(context: &mut Context) {
 
     let mut quit = false;
     while !quit {
+        
+        cam.discard_video();
+        
         if Instant::now().duration_since(now) > interval {
             now = Instant::now();
             colour = colour + 1;
@@ -1445,14 +1600,15 @@ fn do_run_tests(context: &mut Context) {
                     ..
                 } => {
                     //println!("North Pressed");
+                    let colour_visible = cam.get_colour( false );
                     heading = compass.read_degrees().unwrap();
-                    bk_dist = get_distance(&mut back);
-                    lb_dist = get_distance(&mut leftback);
-                    rb_dist = get_distance(&mut rightback);
+                    bk_dist = get_distance(&mut back, true);
+                    lb_dist = get_distance(&mut leftback, true);
+                    rb_dist = get_distance(&mut rightback, true);
 
-                    ft_dist = get_distance(&mut front);
-                    lf_dist = get_distance(&mut leftfront);
-                    rf_dist = get_distance(&mut rightfront);
+                    ft_dist = get_distance(&mut front, true);
+                    lf_dist = get_distance(&mut leftfront, true);
+                    rf_dist = get_distance(&mut rightfront, true);
 
                     context.display.clear();
                     context
@@ -1494,6 +1650,11 @@ fn do_run_tests(context: &mut Context) {
                         .display
                         .draw_text(56, 56, &format!("{:5.2} ", rf_dist), WHITE)
                         .unwrap();
+                    context.display.draw_text(0, 64, "Colour:", WHITE).unwrap();
+                    context
+                        .display
+                        .draw_text(56, 64, &format!("{:?} ", colour_visible), WHITE)
+                        .unwrap();
                     context.display.update().unwrap();
                     break;
                 }
@@ -1501,15 +1662,158 @@ fn do_run_tests(context: &mut Context) {
                     break;
                 }
             };
-        }
-        //println!("Current Heading      {:5.2}  ", heading);
-        //println!("Left Back Distance   {:5.2}  ", lb_dist);
-        //println!("Left Front Distance  {:5.2}  ", lf_dist);
-        //println!("Back Distance        {:5.2}  ", bk_dist);
-        //println!("Front Distance       {:5.2}  ", ft_dist);
-        //println!("Right Back Distance  {:5.2}  ", rb_dist);
-        //println!("Right Front Distance {:5.2}  ", rf_dist);
+        } 
+        heading = compass.read_degrees().unwrap();       
+        ft_dist = get_distance(&mut front, true);
+        bk_dist = get_distance(&mut back, true);
+        lb_dist = get_distance(&mut leftback, true);
+        rb_dist = get_distance(&mut rightback, true);
+        lf_dist = get_distance(&mut leftfront, true);
+        rf_dist = get_distance(&mut rightfront, true);
+
+        println!("Current Heading      {:5.2}  ", heading);
+        println!("Left Back Distance   {:5.2}  ", lb_dist);
+        println!("Back Distance        {:5.2}  ", bk_dist);
+        println!("Front Distance       {:5.2}  ", ft_dist);
+        println!("Right Back Distance  {:5.2}  ", rb_dist);
+        println!("Left Front Distance  {:5.2}  ", lf_dist);
+        println!("Right Front Distance {:5.2}  ", rf_dist);
     }
+    context.pixel.all_off();
+    context.pixel.render();
+    
+}
+
+
+fn load_calibration( cam: &mut Camera ) {
+    let file = fs::File::open("calibrate.json").expect("file should open read only");
+    let mut calibrate: Calibrate = serde_json::from_reader(file).expect("file should be proper JSON");  
+    
+    println!("Calibrate {:?}",calibrate);
+    cam.set_red_lower( &mut calibrate.red_lower ); 
+    cam.set_red_upper( &mut calibrate.red_upper ); 
+    cam.set_green_lower( &mut calibrate.green_lower ); 
+    cam.set_green_upper( &mut calibrate.green_upper ); 
+    cam.set_blue_lower( &mut calibrate.blue_lower ); 
+    cam.set_blue_upper( &mut calibrate.blue_upper ); 
+    cam.set_yellow_lower( &mut calibrate.yellow_lower ); 
+    cam.set_yellow_upper( &mut calibrate.yellow_upper ); 
+    
+    cam.dump_bounds();
+}
+
+
+fn do_calibrate(context: &mut Context) {
+    
+    context.pixel.all_off();
+    context.pixel.render();
+    
+    let mut compass = HMC5883L::new("/dev/i2c-1").unwrap();    
+    let mut front = try_open_tof("/dev/i2c-8");
+    println!("front started");    
+    
+    set_continous(&mut front);
+    
+    let mut control = build_control();
+    control.init();
+
+    let mut distance: u16 = 0;
+    let mut direction = "Front";    
+    let mut diff: i32 = 0;
+    
+    let original = compass.read_degrees().unwrap();
+    let mut heading = compass.read_degrees().unwrap();    
+    
+    let mut left_rear_speed: i32;
+    let mut right_rear_speed: i32;
+    let mut left_front_speed: i32;
+    let mut right_front_speed: i32;
+
+    let mut quit = false;
+    let mut running = false;
+
+    let mut gear = 1;
+    control.set_gear(gear);
+    control.set_bias(50);
+    
+    let mut decel = 0.0;
+    
+    println!(
+        "Init Original {:#?}°,  Heading {:#?}° Diff {:#?} Decel {:?}",
+        original, heading, diff, decel
+    );
+
+    context.pixel.all_on();
+    context.pixel.render();
+
+    context.display.clear();
+    context
+        .display
+        .draw_text(4, 4, "Press start...", WHITE)
+        .unwrap();
+    context.display.update_all().unwrap();
+    
+   while !quit {    
+        while let Some(event) = context.gilrs.next_event() {
+            context.gilrs.update(&event);
+            match event {
+                Event {
+                    id: _,
+                    event: EventType::ButtonPressed(Button::Mode, _),
+                    ..
+                } => {
+                    println!("Mode Pressed");
+                    quit = true;
+                    running = false;
+                    break;
+                }
+    
+                Event {
+                    id: _,
+                    event: EventType::ButtonPressed(Button::Start, _),
+                    ..
+                } => {
+                    println!("Start");   
+                    running = true;
+                }
+                _ => {
+                    // Swallow event
+                }
+            };
+        }
+        if running {            
+            let front_dist = get_distance(&mut front, true);
+            heading = compass.read_degrees().unwrap();
+            //let diff = ((heading - original) * MULTI) as i32;
+            let diff = 0;
+            
+            left_rear_speed = SPEED;
+                right_rear_speed = (SPEED + diff) * -1;
+                left_front_speed = SPEED;
+                right_front_speed = (SPEED + diff) * -1;
+            
+            control.speed(
+                left_rear_speed,
+                right_rear_speed,
+                left_front_speed,
+                right_front_speed,
+            );
+            
+            println!(
+                    "Heading {:#?}°,Dist {:?} Diff {:?}  Speeds lf {:?}, lr {:#?}, rf {:#?}, rr {:#?}",
+                    heading, front_dist, diff, left_front_speed, left_rear_speed, right_front_speed, right_rear_speed
+                );
+                
+            if front_dist < MINDIST {
+                control.stop();
+                running = false;
+                println!("Done");
+            }
+        }  
+    } 
+    context.pixel.all_off();
+    context.pixel.render();
+    
 }
 
 fn show_menu(context: &mut Context, menu: i8) {
@@ -1593,6 +1897,15 @@ fn show_menu(context: &mut Context, menu: i8) {
             .draw_text(32, 108, "Run Tests", WHITE)
             .unwrap();
     }
+    else if menu == 8 {
+        let tiny = image::open("Calibrate.jpg").unwrap();
+
+        context.display.draw_image(0, 16, tiny).unwrap();
+        context
+            .display
+            .draw_text(32, 108, "Calibrate", WHITE)
+            .unwrap();
+    }
 
     context.display.update_all().unwrap();
 }
@@ -1634,10 +1947,10 @@ fn main() {
 
     let mut quit = false;
     while !quit {
-        if menu > 7 {
+        if menu > 8 {
             menu = 0;
         } else if menu < 0 {
-            menu = 7;
+            menu = 8;
         }
 
         if menu != prev {
@@ -1747,6 +2060,17 @@ fn main() {
                             .unwrap();
                         context.display.update_all().unwrap();
                         do_run_tests(&mut context);
+                        prev = -1;
+                        break;
+                    }
+                    if menu == 8 {
+                        context.display.clear();
+                        context
+                            .display
+                            .draw_text(4, 4, "Calibrate", LT_GREY)
+                            .unwrap();
+                        context.display.update_all().unwrap();
+                        do_calibrate(&mut context);
                         prev = -1;
                         break;
                     }
