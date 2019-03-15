@@ -196,7 +196,7 @@ fn get_deceleration(distance: u16) -> f64 {
     let distance_togo = distance - MINDIST;
 	let mut decel = 1.0;
 	if distance_togo < 400 {
-		decel = ((distance_togo as f64)/400.0)/2.0;
+		decel = ((distance_togo as f64)/400.0); // /2.0;
         if decel < 0.2 {
             decel = 0.2;
         }        
@@ -208,7 +208,7 @@ fn get_deceleration(distance: u16) -> f64 {
 
 const SPEED: i32 = 250;
 const MULTI: f32 = 100.0;
-fn align(original: f32, compass: &mut HMC5883L, control: &mut Control, gear: i32) {    
+fn _align(original: f32, compass: &mut HMC5883L, control: &mut Control, gear: i32) {    
     
     control.stop();
     let mut heading = compass.read_degrees().unwrap();
@@ -281,7 +281,7 @@ fn do_canyon(context: &mut Context) {
 
     let mut gear = 1;
     control.set_gear(gear);
-    control.set_bias(50);
+    control.set_bias(0);
     
     let mut decel = 0.0;
     
@@ -342,8 +342,8 @@ fn do_canyon(context: &mut Context) {
         if running {
             heading = compass.read_degrees().unwrap();
 
-            let diff = ((heading - original) * MULTI) as i32;
-            //let diff: i32 = 0;
+            //let diff = ((heading - original) * MULTI) as i32;
+            let diff: i32 = 0;
 
             //let front_dist = front.read();
             //let front_right_dist = rightfront.read();
@@ -361,17 +361,17 @@ fn do_canyon(context: &mut Context) {
                 distance = front_right_dist;
                 decel = get_deceleration( distance );
                 if front_dist < MINDIST {
-                    align( original, &mut compass, &mut control, gear );
+                    //align( original, &mut compass, &mut control, gear );
                     state = 2;
                     direction = "Left";
-                    distance = front_dist;
+                    distance = front_left_dist;
                     decel = get_deceleration( distance );
                 }
             }
 
             if state == 2 && front_left_dist < MINDIST {
                 // && front_dist < 150
-                align( original, &mut compass, &mut control, gear );
+                //align( original, &mut compass, &mut control, gear );
                 state = 3;
                 direction = "Back";
                 distance = front_left_dist;
@@ -379,7 +379,7 @@ fn do_canyon(context: &mut Context) {
             }
             if state == 3 && back_dist < MINDIST {
                 // && front_right_dist < 150 && front_left_dist > 750
-                align( original, &mut compass, &mut control, gear );
+                //align( original, &mut compass, &mut control, gear );
                 state = 4;
                 direction = "Left";
                 distance = back_dist;
@@ -387,7 +387,7 @@ fn do_canyon(context: &mut Context) {
             }
             if state == 4 && front_left_dist < MINDIST {
                 // && back_dist < 150 && front_right_dist > 750
-                align( original, &mut compass, &mut control, gear );
+                //align( original, &mut compass, &mut control, gear );
                 state = 5;
                 direction = "Front";
                 distance = front_left_dist;
@@ -395,7 +395,7 @@ fn do_canyon(context: &mut Context) {
             }
             if state == 5 && front_dist < MINDIST {
                 // && front_right_dist < 150 && front_left_dist > 750
-                align( original, &mut compass, &mut control, gear );
+                //align( original, &mut compass, &mut control, gear );
                 state = 6;
                 direction = "Left";
                 distance = front_dist;
@@ -403,7 +403,7 @@ fn do_canyon(context: &mut Context) {
             }
             if state == 6 && front_left_dist < MINDIST {
                 // && front_dist < 150 && front_right_dist > 750
-                align( original, &mut compass, &mut control, gear );
+                //align( original, &mut compass, &mut control, gear );
                 state = 7;
                 direction = "Back";
                 distance = front_left_dist;
@@ -411,7 +411,7 @@ fn do_canyon(context: &mut Context) {
             }
             if state == 7 && back_dist < MINDIST {
                 // && front_left_dist < 150 && front_dist > 750
-                align( original, &mut compass, &mut control, gear );
+                //align( original, &mut compass, &mut control, gear );
                 state = 8;
                 direction = "Right";
                 distance = back_dist;
@@ -419,7 +419,7 @@ fn do_canyon(context: &mut Context) {
             }
             if state == 8 && front_right_dist < MINDIST {
                 // && front_left_dist > 750 && front_dist > 750
-                align( original, &mut compass, &mut control, gear );
+                //align( original, &mut compass, &mut control, gear );
                 state = 9;
                 direction = "Back";
                 distance = front_right_dist;
@@ -477,10 +477,10 @@ fn do_canyon(context: &mut Context) {
                 current_colour = NONE;
             }
             
-            //left_rear_speed = ((left_rear_speed as f64) * decel) as i32;
-            //right_rear_speed = ((right_rear_speed as f64) * decel) as i32;
-            //left_front_speed = ((left_front_speed as f64) * decel) as i32;
-            //right_front_speed = ((right_front_speed as f64) * decel) as i32;
+            left_rear_speed = ((left_rear_speed as f64) * decel) as i32;
+            right_rear_speed = ((right_rear_speed as f64) * decel) as i32;
+            left_front_speed = ((left_front_speed as f64) * decel) as i32;
+            right_front_speed = ((right_front_speed as f64) * decel) as i32;
             
             if current_colour != previous_colour {
                 if current_colour == RED {
@@ -1710,9 +1710,18 @@ fn do_calibrate(context: &mut Context) {
     
     let mut compass = HMC5883L::new("/dev/i2c-1").unwrap();    
     let mut front = try_open_tof("/dev/i2c-8");
+    let mut leftfront = try_open_tof("/dev/i2c-5");
+    let mut rightfront = try_open_tof("/dev/i2c-10");        
+    let mut back = try_open_tof("/dev/i2c-7");
     println!("front started");    
+    println!("left front started");    
+    println!("right front started");
+    println!("back started");    
     
     set_continous(&mut front);
+    set_continous(&mut leftfront);
+    set_continous(&mut rightfront);
+    set_continous(&mut back);
     
     let mut control = build_control();
     control.init();
@@ -1724,17 +1733,18 @@ fn do_calibrate(context: &mut Context) {
     let original = compass.read_degrees().unwrap();
     let mut heading = compass.read_degrees().unwrap();    
     
-    let mut left_rear_speed: i32;
-    let mut right_rear_speed: i32;
-    let mut left_front_speed: i32;
-    let mut right_front_speed: i32;
+    let mut left_rear_speed: i32 = 0;
+    let mut right_rear_speed: i32 = 0;
+    let mut left_front_speed: i32 = 0;
+    let mut right_front_speed: i32 = 0;
 
     let mut quit = false;
     let mut running = false;
+    let mut direction = "North";
 
     let mut gear = 1;
     control.set_gear(gear);
-    control.set_bias(50);
+    control.set_bias(0);
     
     let mut decel = 0.0;
     
@@ -1767,13 +1777,36 @@ fn do_calibrate(context: &mut Context) {
                     running = false;
                     break;
                 }
-    
                 Event {
                     id: _,
-                    event: EventType::ButtonPressed(Button::Start, _),
+                    event: EventType::ButtonPressed(Button::North, _),
                     ..
                 } => {
-                    println!("Start");   
+                    direction = "North";                    
+                    running = true;
+                }
+                Event {
+                    id: _,
+                    event: EventType::ButtonPressed(Button::South, _),
+                    ..
+                } => {
+                    direction = "South";                    
+                    running = true;
+                }
+                Event {
+                    id: _,
+                    event: EventType::ButtonPressed(Button::West, _),
+                    ..
+                } => {
+                    direction = "West";                    
+                    running = true;
+                }
+                Event {
+                    id: _,
+                    event: EventType::ButtonPressed(Button::East, _),
+                    ..
+                } => {
+                    direction = "East";                    
                     running = true;
                 }
                 _ => {
@@ -1781,17 +1814,46 @@ fn do_calibrate(context: &mut Context) {
                 }
             };
         }
-        if running {            
-            let front_dist = get_distance(&mut front, true);
-            heading = compass.read_degrees().unwrap();
+        if running {
+            println!("Direction {:?}",direction);               
+            let mut distance = get_distance(&mut front, true);
+            //heading = compass.read_degrees().unwrap();
             //let diff = ((heading - original) * MULTI) as i32;
             let diff = 0;
+            let bias = 50;
+            decel = get_deceleration( distance );
             
-            left_rear_speed = SPEED;
-                right_rear_speed = (SPEED + diff) * -1;
+            if direction == "North" {
+                distance = get_distance(&mut front, true);
+                left_rear_speed = SPEED + bias;
+                right_rear_speed = SPEED * -1;
+                left_front_speed = SPEED + bias;
+                right_front_speed = SPEED * -1;
+            } else if direction == "South" {
+                distance = get_distance(&mut back, true);
+                left_rear_speed = (SPEED + bias) * -1;
+                right_rear_speed = SPEED;
+                left_front_speed = (SPEED + bias) * -1;
+                right_front_speed = SPEED;
+            } else if direction == "West" {                
+                distance = get_distance(&mut leftfront, true);                
                 left_front_speed = SPEED;
-                right_front_speed = (SPEED + diff) * -1;
+                left_rear_speed = SPEED  * -1;
+                right_front_speed = SPEED;
+                right_rear_speed = SPEED  * -1;                
+            } else if direction == "East" {                
+                distance = get_distance(&mut rightfront, true);
+                left_front_speed = SPEED  * -1;
+                left_rear_speed = SPEED; 
+                right_front_speed = SPEED  * -1;
+                right_rear_speed = SPEED;                
+            } 
             
+            left_rear_speed = ((left_rear_speed as f64) * decel) as i32;
+            right_rear_speed = ((right_rear_speed as f64) * decel) as i32;
+            left_front_speed = ((left_front_speed as f64) * decel) as i32;
+            right_front_speed = ((right_front_speed as f64) * decel) as i32;
+        
             control.speed(
                 left_rear_speed,
                 right_rear_speed,
@@ -1800,11 +1862,11 @@ fn do_calibrate(context: &mut Context) {
             );
             
             println!(
-                    "Heading {:#?}°,Dist {:?} Diff {:?}  Speeds lf {:?}, lr {:#?}, rf {:#?}, rr {:#?}",
-                    heading, front_dist, diff, left_front_speed, left_rear_speed, right_front_speed, right_rear_speed
+                    "Heading {:#?}°,Dist {:?}  Speeds lf {:?}, lr {:#?}, rf {:#?}, rr {:#?}",
+                    heading, distance, left_front_speed, left_rear_speed, right_front_speed, right_rear_speed
                 );
                 
-            if front_dist < MINDIST {
+            if distance < MINDIST {
                 control.stop();
                 running = false;
                 println!("Done");

@@ -37,7 +37,7 @@ impl Control {
     pub fn set_bias(&mut self, bias: i32) {
         self.bias = bias;
     }
-
+        
     pub fn speed(
         &mut self,
         left_rear_speed: i32,
