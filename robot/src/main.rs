@@ -195,8 +195,8 @@ fn get_deceleration(distance: u16) -> f64 {
     }
     let distance_togo = distance - MINDIST;
 	let mut decel = 1.0;
-	if distance_togo < 400 {
-		decel = ((distance_togo as f64)/400.0); // /2.0;
+	if distance_togo < 300 {
+		decel = ((distance_togo as f64)/300.0);
         if decel < 0.2 {
             decel = 0.2;
         }        
@@ -206,24 +206,33 @@ fn get_deceleration(distance: u16) -> f64 {
 }
 
 
-const SPEED: i32 = 250;
+const SPEED: i32 = 300;
 const MULTI: f32 = 100.0;
-fn _align(original: f32, compass: &mut HMC5883L, control: &mut Control, gear: i32) {    
+const DIST: u16 = 30;   // Side sensors are behind the wheels 
+fn align(original: f32, compass: &mut HMC5883L, control: &mut Control, gear: i32) {    
     
     control.stop();
     let mut heading = compass.read_degrees().unwrap();
-    let mut diff = ((heading - original) * MULTI) as i32;
-    while diff > 5 || diff < -5 {
-        heading = compass.read_degrees().unwrap();
-        diff = ((heading - original) * MULTI) as i32;
-        println!(
-                    "Heading {:#?}°:{:#?}°  Diff {:#?}",
-                     original, heading, diff
+    let mut diff = heading - original;
+    if diff > 0.0 {        
+        while diff > 0.0 {
+            heading = compass.read_degrees().unwrap();
+            diff = heading - original;
+            println!(
+                "Heading {:#?}°:{:#?}°  Diff {:#?}",
+                 original, heading, diff
                 );
-        if diff < 0 {
-            control.turn_right( SPEED, 4);
-        } else {
-            control.turn_left( SPEED, 4);  
+            control.turn_left( SPEED, gear);
+        }
+    } else {
+        while diff < 0.0 {
+            heading = compass.read_degrees().unwrap();
+            diff = heading - original;
+            println!(
+                "Heading {:#?}°:{:#?}°  Diff {:#?}",
+                 original, heading, diff
+                );
+            control.turn_right( SPEED, gear);
         }
     }
     control.stop();
@@ -652,7 +661,6 @@ fn calc_target( heading: f32, offset: f32 ) -> f32 {
     println!("Target {}", target);
     return target;
  }  
-    
     
 fn _do_hubble(context: &mut Context, mut locations: [i32; 4]) {
     context.pixel.all_on();
@@ -1809,70 +1817,107 @@ fn do_calibrate(context: &mut Context) {
                     direction = "East";                    
                     running = true;
                 }
+                Event {
+                    id: _,
+                    event: EventType::ButtonPressed(Button::Start, _),
+                    ..
+                } => {
+                    direction = "Align";                    
+                    running = true;
+                }
                 _ => {
                     // Swallow event
                 }
             };
         }
+        
+        
         if running {
-            println!("Direction {:?}",direction);               
-            let mut distance = get_distance(&mut front, true);
+            //println!("Direction {:?}",direction);               
+            let mut distance = 0 as u16;
             //heading = compass.read_degrees().unwrap();
-            //let diff = ((heading - original) * MULTI) as i32;
             let diff = 0;
             let bias = 50;
-            decel = get_deceleration( distance );
             
+            if direction == "Align" {
+                control.stop();
+                context.pixel.all_off();
+                context.pixel.render();
+                align(original, &mut compass, &mut control, 4 );
+                direction = "None"
+            }
             if direction == "North" {
                 distance = get_distance(&mut front, true);
+                decel = get_deceleration( distance );
                 left_rear_speed = SPEED + bias;
                 right_rear_speed = SPEED * -1;
                 left_front_speed = SPEED + bias;
                 right_front_speed = SPEED * -1;
-            } else if direction == "South" {
+            }
+            if direction == "South" {
                 distance = get_distance(&mut back, true);
+                decel = get_deceleration( distance );
                 left_rear_speed = (SPEED + bias) * -1;
                 right_rear_speed = SPEED;
                 left_front_speed = (SPEED + bias) * -1;
                 right_front_speed = SPEED;
-            } else if direction == "West" {                
-                distance = get_distance(&mut leftfront, true);                
+            }
+            if direction == "West" {                
+                distance = get_distance(&mut leftfront, true); 
+                //if distance > DIST {               
+                    //distance = distance - DIST;
+                //}
+                decel = get_deceleration( distance );
                 left_front_speed = SPEED;
                 left_rear_speed = SPEED  * -1;
                 right_front_speed = SPEED;
                 right_rear_speed = SPEED  * -1;                
-            } else if direction == "East" {                
-                distance = get_distance(&mut rightfront, true);
+            }
+            if direction == "East" {                
+                distance = get_distance(&mut rightfront, true);                
+                //if distance > DIST {               
+                    //distance = distance - DIST;
+                //}           
+                decel = get_deceleration( distance );
                 left_front_speed = SPEED  * -1;
                 left_rear_speed = SPEED; 
                 right_front_speed = SPEED  * -1;
                 right_rear_speed = SPEED;                
             } 
             
-            left_rear_speed = ((left_rear_speed as f64) * decel) as i32;
-            right_rear_speed = ((right_rear_speed as f64) * decel) as i32;
-            left_front_speed = ((left_front_speed as f64) * decel) as i32;
-            right_front_speed = ((right_front_speed as f64) * decel) as i32;
-        
-            control.speed(
-                left_rear_speed,
-                right_rear_speed,
-                left_front_speed,
-                right_front_speed,
-            );
+            if direction == "North" || direction == "South" || direction == "West" || direction == "East" {
+                left_rear_speed = ((left_rear_speed as f64) * decel) as i32;
+                right_rear_speed = ((right_rear_speed as f64) * decel) as i32;
+                left_front_speed = ((left_front_speed as f64) * decel) as i32;
+                right_front_speed = ((right_front_speed as f64) * decel) as i32;
             
-            println!(
-                    "Heading {:#?}°,Dist {:?}  Speeds lf {:?}, lr {:#?}, rf {:#?}, rr {:#?}",
-                    heading, distance, left_front_speed, left_rear_speed, right_front_speed, right_rear_speed
+                control.speed(
+                    left_rear_speed,
+                    right_rear_speed,
+                    left_front_speed,
+                    right_front_speed,
                 );
                 
-            if distance < MINDIST {
-                control.stop();
-                running = false;
-                println!("Done");
+                println!(
+                        "Direction {:?} Org {:#?}° Head {:#?}° Decel {:#?},Dist {:?}",
+                        direction, original, heading, decel, distance
+                    );
+                    
+                println!(
+                        "Speeds lf {:?}, lr {:#?}, rf {:#?}, rr {:#?}",
+                         left_front_speed, left_rear_speed, right_front_speed, right_rear_speed
+                    );
+                    
+                if distance < MINDIST {
+                    control.stop();
+                    running = false;
+                    println!("Done");
+                }
             }
         }  
+        
     } 
+    control.stop();
     context.pixel.all_off();
     context.pixel.render();
     
