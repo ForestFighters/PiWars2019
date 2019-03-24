@@ -95,8 +95,11 @@ impl VL53L0X {
         let dist1: u16 = (data[10]).into();
         let dist2: u16 = (data[11]).into();
         let mut distance = (dist1 * 256) + dist2;
-        if distance <= 20 || distance > 1900 {
-            distance = 9999
+        if distance <= 20  {
+            distance = 9999;
+        }
+        if distance > 1900 {
+            distance = 9999;
         }
         Ok(distance as u16)
     }
