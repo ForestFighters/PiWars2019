@@ -52,7 +52,7 @@ impl Pixel {
         leds[4] = [255, 0, 0, 0];
         leds[5] = [255, 0, 0, 0];
     }
-    
+
     pub fn cyan(&mut self) {
         let leds = self.controller.leds_mut(0);
         leds[0] = [255, 255, 0, 0];
@@ -72,7 +72,7 @@ impl Pixel {
         leds[4] = [0, 255, 255, 0];
         leds[5] = [0, 255, 255, 0];
     }
-    
+
     pub fn purple(&mut self) {
         let leds = self.controller.leds_mut(0);
         leds[0] = [255, 0, 255, 0];
@@ -82,7 +82,7 @@ impl Pixel {
         leds[4] = [255, 0, 255, 0];
         leds[5] = [255, 0, 255, 0];
     }
-    
+
     pub fn white(&mut self) {
         let leds = self.controller.leds_mut(0);
         leds[0] = [255, 255, 255, 0];
@@ -92,7 +92,6 @@ impl Pixel {
         leds[4] = [255, 255, 255, 0];
         leds[5] = [255, 255, 255, 0];
     }
-    
 
     pub fn all_off(&mut self) {
         let leds = self.controller.leds_mut(0);

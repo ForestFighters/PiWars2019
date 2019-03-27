@@ -51,17 +51,20 @@ impl Motor {
 
     pub fn stop(&self) {
         // Depending on the last direction flip the direction pin to the oposite.
-        if self.direction  {
+        if self.direction {
             write(self.dir_pin, ON).unwrap();
-        }
-        else {
+        } else {
             write(self.dir_pin, OFF).unwrap();
-        }        
-        pwm(self.pwm_pin, 0).unwrap();        
+        }
+        pwm(self.pwm_pin, 0).unwrap();
     }
 }
 
-pub fn build_motor(pwm_pin: u32, dir_pin: u32) -> Motor {    
+pub fn build_motor(pwm_pin: u32, dir_pin: u32) -> Motor {
     let direction = true;
-    Motor { pwm_pin, dir_pin, direction }
+    Motor {
+        pwm_pin,
+        dir_pin,
+        direction,
+    }
 }
