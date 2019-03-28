@@ -411,7 +411,7 @@ impl Camera {
             let area = moments.m00;
 
             //println!("Area {:#?}",area);
-            if area > 5000f64 {
+            if area > 10000f64 {
                 if *colour == self.red {
                     try!(core::rectangle(
                         &mut frame2,
