@@ -354,13 +354,9 @@ fn do_canyon(context: &mut Context) {
         if running {
             let diff: i32 = 0;
 
-            thread::sleep(interval); 
             let front_dist = get_distance(&mut front, true);
-            thread::sleep(interval); 
             let right_dist = get_distance(&mut rightfront, true);
-            thread::sleep(interval); 
             let left_dist = get_distance(&mut leftfront, true);
-            thread::sleep(interval); 
             let back_dist = get_distance(&mut back, true);
 
             if direction == "Forward" {
@@ -412,7 +408,7 @@ fn do_canyon(context: &mut Context) {
                 right_front_speed = SPEED * -1;
                 current_colour = GREEN;
             } else if direction == "Back" {
-                let bias = 20;
+                let bias = 40;
                 left_rear_speed = (SPEED + bias) * -1;
                 right_rear_speed = SPEED;
                 left_front_speed = (SPEED + bias) * -1;
@@ -420,10 +416,11 @@ fn do_canyon(context: &mut Context) {
                 current_colour = RED;
             } else if direction == "Right" {
                 // Strafe Right
+                let bias = 30;
                 left_front_speed = SPEED * -1;
-                left_rear_speed = SPEED;
+                left_rear_speed = SPEED - bias;
                 right_front_speed = SPEED * -1;
-                right_rear_speed = SPEED;
+                right_rear_speed = SPEED - bias;
                 current_colour = PURPLE;
             } else if direction == "Left" {
                 // Strafe Left
@@ -472,7 +469,6 @@ fn do_canyon(context: &mut Context) {
                 "Speeds lf {:?}, lr {:#?}, rf {:#?}, rr {:#?}",
                 left_front_speed, left_rear_speed, right_front_speed, right_rear_speed
             );
-
             control.speed(
                 left_rear_speed,
                 right_rear_speed,
@@ -1558,7 +1554,7 @@ fn load_calibration(cam: &mut Camera) {
     cam.dump_bounds();
 }
 
-fn _do_calibrate(context: &mut Context) {
+fn do_calibrate(context: &mut Context) {
     context.pixel.all_off();
     context.pixel.render();
 
@@ -1596,7 +1592,7 @@ fn _do_calibrate(context: &mut Context) {
     let mut running = false;
     let mut direction = "North";
 
-    let mut gear = 2;
+    let mut gear = 1;
     control.set_gear(gear);
     control.set_bias(0);
 
@@ -1686,8 +1682,7 @@ fn _do_calibrate(context: &mut Context) {
             let mut distance = 0 as u16;
             //heading = compass.read_degrees().unwrap();
             let diff = 0;
-            let bias = 50;
-            let bias2 = 30;
+            
 
             if direction == "Align" {
                 control.stop();
@@ -1697,6 +1692,7 @@ fn _do_calibrate(context: &mut Context) {
                 direction = "None"
             }
             if direction == "North" {
+                let bias = 40;
                 distance = front_distance;
                 decel = get_deceleration(distance);
                 left_rear_speed = SPEED + bias;
@@ -1705,6 +1701,7 @@ fn _do_calibrate(context: &mut Context) {
                 right_front_speed = SPEED * -1;
             }
             if direction == "South" {
+                let bias = 40;
                 distance = back_distance;
                 decel = get_deceleration(distance);
                 left_rear_speed = (SPEED + bias) * -1;
@@ -1713,25 +1710,24 @@ fn _do_calibrate(context: &mut Context) {
                 right_front_speed = SPEED;
             }
             if direction == "West" {
+                let bias = 10;
                 distance = left_distance;
                 //if distance > DIST {
                 //distance = distance - DIST;
                 //}
                 decel = get_deceleration(distance);
                 left_front_speed = SPEED;
-                left_rear_speed = SPEED * -1;
-                right_front_speed = SPEED + bias2;
-                right_rear_speed = (SPEED + bias2) * -1;
+                left_rear_speed = (SPEED + bias) * -1;
+                right_front_speed = SPEED;
+                right_rear_speed = (SPEED + bias) * -1;
             }
             if direction == "East" {
+                let bias = 30;
                 distance = right_distance;
-                //if distance > DIST {
-                //distance = distance - DIST;
-                //}
                 decel = get_deceleration(distance);
                 left_front_speed = SPEED * -1;
-                left_rear_speed = SPEED;
-                right_front_speed = (SPEED - bias) * -1;
+                left_rear_speed = SPEED - bias;
+                right_front_speed = SPEED * -1;
                 right_rear_speed = SPEED - bias;
             }
 
@@ -1780,7 +1776,7 @@ fn _do_calibrate(context: &mut Context) {
 //use std::sync::Arc;
 //use std::sync::Mutex;
 
-fn do_calibrate(context: &mut Context) {
+fn _do_calibrate(context: &mut Context) {
     context.pixel.all_off();
     context.pixel.render();
 
