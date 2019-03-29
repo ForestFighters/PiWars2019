@@ -970,9 +970,17 @@ fn do_straight(context: &mut Context) {
     let mut control = build_control();
     control.init();
     control.set_gear(2);
+    
+// Distance sensors
+    
+    let mut left = try_open_tof("/dev/i2c-5");
+    let mut right = try_open_tof("/dev/i2c-10");
+    println!("left front started");
+    println!("right front started");
 
-    let mut left = VL53L0X::new("/dev/i2c-5").unwrap();
-    let mut right = VL53L0X::new("/dev/i2c-10").unwrap();
+    set_continous(&mut left);
+    set_continous(&mut right);
+
 
     context.pixel.all_on();
     context.pixel.render();
@@ -999,7 +1007,7 @@ fn do_straight(context: &mut Context) {
                     println!("Select Pressed");
                     // Start button -> running
                     context.pixel.all_off();
-                    target = left.read() as i32 - right.read() as i32;
+                    target = get_distance(&mut left, true) as i32 - get_distance(&mut right, true) as i32;
                     context
                         .display
                         .draw_text(4, 4, "              ", WHITE)
@@ -1028,8 +1036,8 @@ fn do_straight(context: &mut Context) {
             let mut left_front_speed: i32 = 1000;
             let mut right_front_speed: i32 = -1000;
 
-            let right_dist: i32 = right.read() as i32;
-            let left_dist: i32 = left.read() as i32;
+            let right_dist: i32 = get_distance(&mut right, true) as i32;
+            let left_dist: i32 = get_distance(&mut left, true) as i32;
 
             println!(
                 "Target {:#?}mm, Right {:#?}mm, Left {:#?}mm ",
