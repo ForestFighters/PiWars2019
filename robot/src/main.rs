@@ -77,9 +77,9 @@ pub struct Calibrate {
 }
 
 fn _test() {
-    // Test compass
-    let mut compass = HMC5883L::new("/dev/i2c-1").unwrap();
-    println!("Compass started");
+    //// Test compass
+    //let mut compass = HMC5883L::new("/dev/i2c-1").unwrap();
+    //println!("Compass started");
 
     // Test distance sensors
     let mut leftfront = VL53L0X::new("/dev/i2c-5").unwrap();
@@ -96,11 +96,11 @@ fn _test() {
     println!("right back started");
 
     loop {
-        println!(
-            "\x1B[HCurrent Heading {:.*}  ",
-            1,
-            compass.read_degrees().unwrap()
-        );
+        //println!(
+            //"\x1B[HCurrent Heading {:.*}  ",
+            //1,
+            //compass.read_degrees().unwrap()
+        //);
         println!("Left Back Distance   {:.*}   ", 1, leftback.read());
         println!("Left Front Distance  {:.*}   ", 1, leftfront.read());
         println!("Back Distance        {:.*}   ", 1, back.read());
@@ -177,15 +177,15 @@ fn _test5() {
 const MINDIST: u16 = 300;
 const MAXDIST: u16 = 500;
 const SPEED: i32 = 350;
-fn get_deceleration(distance: u16) -> f64 {
+fn get_deceleration(distance: u16, min: u16) -> f64 {
     
-    if distance < MINDIST {
+    if distance < min {
         return 0.0;
     }
-    let distance_togo = distance - MINDIST;
+    let distance_togo = distance - min;
     let mut decel = 1.0;
-    if distance_togo < MINDIST {
-        decel = ((distance_togo as f64) / MINDIST as f64);
+    if distance_togo < min {
+        decel = ((distance_togo as f64) / min as f64);
         if decel < 0.4 {
             decel = 0.4;
         }
@@ -194,73 +194,75 @@ fn get_deceleration(distance: u16) -> f64 {
     return decel;
 }
 
-fn calc_target(original: f32, heading: f32) -> f32 {
-    let mut target = 0.0;
-    if heading > original {
-        // heading 270 > original 5
-        // Is the distance between (360 - heading + original) (A)
-        // 360 - 270 + 5 = 95
-        let a = 360.0 - heading + original;
-        // Greater than distance between  heading - original (B)
-        // 270 - 5 = 265
-        let b = heading - original;
-        if a < b {
-            target = a;
-        } else {
-            target = -b;
-        }
-    } else {
-        // heading 5 < original 270
-        // Is the distance between (360 - original + heading) (A)
-        // 360 - 270 + 5 = 95
-        let a = 360.0 - heading + original;
-        // Greater than distance between  original - heading (B)
-        // 270 - 5 = 265
-        let b = heading - original;
-        if a < b {
-            target = -a;
-        } else {
-            target = b;
-        }
-    }
+//fn _calc_target(original: f32, heading: f32) -> f32 {
+    //let mut target = 0.0;
+    //if heading > original {
+        //// heading 270 > original 5
+        //// Is the distance between (360 - heading + original) (A)
+        //// 360 - 270 + 5 = 95
+        //let a = 360.0 - heading + original;
+        //// Greater than distance between  heading - original (B)
+        //// 270 - 5 = 265
+        //let b = heading - original;
+        //if a < b {
+            //target = a;
+        //} else {
+            //target = -b;
+        //}
+    //} else {
+        //// heading 5 < original 270
+        //// Is the distance between (360 - original + heading) (A)
+        //// 360 - 270 + 5 = 95
+        //let a = 360.0 - heading + original;
+        //// Greater than distance between  original - heading (B)
+        //// 270 - 5 = 265
+        //let b = heading - original;
+        //if a < b {
+            //target = -a;
+        //} else {
+            //target = b;
+        //}
+    //}
 
-    return target;
-}
+    //return target;
+//}
 
-fn align(original: f32, compass: &mut HMC5883L, control: &mut Control, cam: &mut Camera, gear: i32) {
-    control.stop();
-    let mut heading = compass.read_degrees().unwrap();
-    let mut diff = calc_target(original, heading);
 
-    if diff < 0.5 && diff > -0.5 {
-        return;
-    }
+//fn _align(original: f32, compass: &mut HMC5883L, control: &mut Control, cam: &mut Camera, gear: i32) {
+    //control.stop();
+    //let mut heading = compass.read_degrees().unwrap();
+    //let mut diff = calc_target(original, heading);
 
-    if diff > 0.0 {
-        while diff > 1.0 {
-            heading = compass.read_degrees().unwrap();
-            diff = calc_target(original, heading);
-            println!(
-                "Original {:#?}°  Current {:#?}°  Diff {:#?}",
-                original, heading, diff
-            );
-            control.turn_left(SPEED, gear);
-            cam.discard_video();
-        }
-    } else {
-        while diff < -1.0 {
-            heading = compass.read_degrees().unwrap();
-            diff = calc_target(original, heading);
-            println!(
-                "Original {:#?}°  Current {:#?}°  Diff {:#?}",
-                original, heading, diff
-            );
-            control.turn_right(SPEED, gear);
-            cam.discard_video();
-        }
-    }
-    control.stop();
-}
+    //if diff < 0.5 && diff > -0.5 {
+        //return;
+    //}
+
+    //if diff > 0.0 {
+        //while diff > 1.0 {
+            //heading = compass.read_degrees().unwrap();
+            //diff = calc_target(original, heading);
+            //println!(
+                //"Original {:#?}°  Current {:#?}°  Diff {:#?}",
+                //original, heading, diff
+            //);
+            //control.turn_left(SPEED, gear);
+            //cam.discard_video();
+        //}
+    //} else {
+        //while diff < -1.0 {
+            //heading = compass.read_degrees().unwrap();
+            //diff = calc_target(original, heading);
+            //println!(
+                //"Original {:#?}°  Current {:#?}°  Diff {:#?}",
+                //original, heading, diff
+            //);
+            //control.turn_right(SPEED, gear);
+            //cam.discard_video();
+        //}
+    //}
+    //control.stop();
+//}
+
 
 fn do_canyon(context: &mut Context) {
     
@@ -360,14 +362,14 @@ fn do_canyon(context: &mut Context) {
             let back_dist = get_distance(&mut back, true);
 
             if direction == "Forward" {
-                decel = get_deceleration(front_dist);
+                decel = get_deceleration(front_dist, MINDIST);
                 if front_dist < MINDIST && right_dist < MAXDIST {
                     direction = "Left";
                 }
             }
 
             if direction == "Left" {
-                decel = get_deceleration(left_dist);
+                decel = get_deceleration(left_dist, MINDIST);
                 if left_dist < MINDIST && back_dist < MAXDIST {                    
                     direction = "Forward";
                 }
@@ -377,7 +379,7 @@ fn do_canyon(context: &mut Context) {
             }
 
             if direction == "Back" {
-                decel = get_deceleration(back_dist);
+                decel = get_deceleration(back_dist, MINDIST);
                 if back_dist < MINDIST && left_dist < MAXDIST {
                     control.stop();
                     direction = "Right";
@@ -389,7 +391,7 @@ fn do_canyon(context: &mut Context) {
             }
 
             if direction == "Right" {
-                decel = get_deceleration(right_dist);
+                decel = get_deceleration(right_dist, MINDIST);
                 if right_dist < MINDIST {
                     direction = "Back";
                 }
@@ -520,7 +522,240 @@ fn print_colour(context: &mut Context, colour: i32) -> &str {
     }
 }
 
-fn do_hubble(context: &mut Context, mut locations: [f32; 4], mut order: [i32; 4]) {
+fn do_hubble(context: &mut Context, mut locations: [f32; 4], mut order: [i32; 4]){
+    
+    const MINIMUM : u16 = 200;
+    let interval = time::Duration::from_millis(50);
+    
+    // Distance sensors
+    let mut front = try_open_tof("/dev/i2c-8");
+    let mut back = try_open_tof("/dev/i2c-7");
+    
+    println!("front started");
+    println!("back started");
+    println!("right back started");
+    println!("left back started");
+
+    set_continous(&mut front);
+    set_continous(&mut back);
+    
+    let mut front_dist = get_distance(&mut front, true);
+    let mut back_dist = get_distance(&mut back, true);
+    
+    let mut leftback = try_open_tof("/dev/i2c-6");
+    let mut rightback = try_open_tof("/dev/i2c-9");
+    
+    set_continous(&mut leftback);
+    set_continous(&mut rightback);
+    
+    let mut right_dist = get_distance(&mut rightback, true);
+    let mut left_dist = get_distance(&mut leftback, true);
+
+    let mut control = build_control();
+    control.init();
+
+    let mut distance: u16 = 0;
+    let mut direction = "Start";
+    let mut prev_dir = "None";
+
+    let mut left_rear_speed: i32;
+    let mut right_rear_speed: i32;
+    let mut left_front_speed: i32;
+    let mut right_front_speed: i32;
+
+    let mut quit = false;
+    let mut running = false;
+
+    let mut gear = 1;
+    control.set_gear(gear);
+    control.set_bias(0);
+
+    let mut decel = 0.0;
+
+    context.pixel.all_on();
+    context.pixel.render();
+
+    context.display.clear();
+    context
+        .display
+        .draw_text(4, 4, "Press start...", WHITE)
+        .unwrap();
+    context.display.update_all().unwrap();
+
+    let mut current_colour = NONE;
+    let mut previous_colour = NONE;
+
+    while !quit {
+        while let Some(event) = context.gilrs.next_event() {
+            match event {
+                Event {
+                    id: _,
+                    event: EventType::ButtonPressed(Button::Start, _),
+                    ..
+                } => {
+                    // Start button -> running
+                    context.pixel.all_off();
+                    context.pixel.render();
+
+                    context.display.clear();
+                    context
+                        .display
+                        .draw_text(4, 4, "Running       ", WHITE)
+                        .unwrap();
+                    context.display.update().unwrap();
+                    running = true;
+                }
+                Event {
+                    id: _,
+                    event: EventType::ButtonPressed(Button::Mode, _),
+                    ..
+                } => {
+                    println!("Mode....");
+                    // Mode to exit
+                    quit = true;
+                    break;
+                }
+                _ => (),
+            };
+        }
+
+        if running {
+            let diff: i32 = 0;
+
+            front_dist = get_distance(&mut front, true);
+            right_dist = get_distance(&mut rightback, true);
+            left_dist = get_distance(&mut leftback, true);
+            back_dist = get_distance(&mut back, true);
+
+            // Hubble
+            if direction == "Start" {
+                decel = get_deceleration(front_dist, MINIMUM);
+                if front_dist < MINIMUM {
+                    direction = "Left";
+                }
+            }
+
+            if direction == "Left" {
+                decel = get_deceleration(left_dist, MINIMUM);                
+                if left_dist < MINIMUM {
+                    direction = "Back";
+                }
+            }
+
+            if direction == "Back" {
+                decel = get_deceleration(back_dist, MINIMUM);
+                if back_dist < MINIMUM {                    
+                    direction = "Right";
+                }
+            }
+
+            if direction == "Right" {
+                decel = get_deceleration(right_dist, MINIMUM);
+                if right_dist < MINIMUM {
+                    direction = "Forward";
+                }
+            }
+            
+            if direction == "Forward" {
+                decel = get_deceleration(front_dist, MINIMUM);
+                if front_dist < MINIMUM {
+                    direction = "Stop";
+                }
+            }
+
+            println!(
+                "Direction {:#?} Fr {:#?}mm Lf {:#?}mm Rt {:#?}mm Bk {:#?}mm   Decel {:?}     ",
+                direction, front_dist, left_dist, right_dist, back_dist, decel
+            );
+
+            if direction == "Start" || direction == "Forward" {
+                let bias = 40;
+                left_rear_speed = SPEED + bias;
+                right_rear_speed = SPEED * -1;
+                left_front_speed = SPEED + bias;
+                right_front_speed = SPEED * -1;
+                current_colour = GREEN;
+            } else if direction == "Back" {
+                let bias = 40;
+                left_rear_speed = (SPEED + bias) * -1;
+                right_rear_speed = SPEED;
+                left_front_speed = (SPEED + bias) * -1;
+                right_front_speed = SPEED;
+                current_colour = RED;
+            } else if direction == "Right" {
+                // Strafe Right
+                let bias = 30;
+                left_front_speed = SPEED * -1;
+                left_rear_speed = SPEED - bias;
+                right_front_speed = SPEED * -1;
+                right_rear_speed = SPEED - bias;
+                current_colour = PURPLE;
+            } else if direction == "Left" {
+                // Strafe Left
+                let bias = 10;
+                left_front_speed = SPEED;
+                left_rear_speed = (SPEED + bias) * -1;
+                right_front_speed = SPEED;
+                right_rear_speed = (SPEED + bias) * -1;
+                current_colour = CYAN;
+            } else {
+                left_rear_speed = 0;
+                right_rear_speed = 0;
+                left_front_speed = 0;
+                right_front_speed = 0;
+                current_colour = NONE;
+            }
+
+            left_rear_speed = ((left_rear_speed as f64) * decel) as i32;
+            right_rear_speed = ((right_rear_speed as f64) * decel) as i32;
+            left_front_speed = ((left_front_speed as f64) * decel) as i32;
+            right_front_speed = ((right_front_speed as f64) * decel) as i32;
+
+            if current_colour != previous_colour {
+                if current_colour == RED {
+                    context.pixel.red();
+                } else if current_colour == GREEN {
+                    context.pixel.green();
+                } else if current_colour == BLUE {
+                    context.pixel.blue();
+                } else if current_colour == YELLOW {
+                    context.pixel.yellow();
+                } else if current_colour == PURPLE {
+                    context.pixel.purple();
+                } else if current_colour == CYAN {
+                    context.pixel.cyan();
+                } else if current_colour == ALL {
+                    context.pixel.white();
+                } else if current_colour == NONE {
+                    context.pixel.all_off();
+                }
+                context.pixel.render();
+                previous_colour = current_colour;
+            }
+
+            //println!(
+                //"Speeds lf {:?}, lr {:#?}, rf {:#?}, rr {:#?}",
+                //left_front_speed, left_rear_speed, right_front_speed, right_rear_speed
+            //);
+            control.speed(
+                left_rear_speed,
+                right_rear_speed,
+                left_front_speed,
+                right_front_speed,
+            );
+        }
+    }
+
+    context.pixel.all_off();
+    context.pixel.render();
+
+    control.stop();
+    context.display.clear();
+}
+
+use std::sync::{Arc, Mutex};
+
+fn _do_hubble(context: &mut Context, mut locations: [f32; 4], mut order: [i32; 4]) {
     const DRIVING_SPEED: i32 = 1000;
     const TURNING_SPEED: i32 = 400;
     const MIN_DIST: u16 = 100;
@@ -539,7 +774,7 @@ fn do_hubble(context: &mut Context, mut locations: [f32; 4], mut order: [i32; 4]
 
     let mut pos = 0;
 
-    let mut compass = HMC5883L::new("/dev/i2c-1").unwrap();
+    //let mut compass = HMC5883L::new("/dev/i2c-1").unwrap();
 
     let mut front = try_open_tof("/dev/i2c-8");
     let mut back = try_open_tof("/dev/i2c-7");
@@ -563,15 +798,34 @@ fn do_hubble(context: &mut Context, mut locations: [f32; 4], mut order: [i32; 4]
     let mut running = false;
     let mut quit = false;
 
-    let mut heading = compass.read_degrees().unwrap();
-    let mut target = compass.read_degrees().unwrap();
-    let mut colour = NONE;
-
-    let mut cam = build_camera();
-    load_calibration(&mut cam);
+    //let mut heading = compass.read_degrees().unwrap();
+    //let mut target = compass.read_degrees().unwrap();
+    
+    let colour: i32 = NONE;
+    let shared = Arc::new(colour);
+    let (command_tx, command_rx) = mpsc::channel();
+    
+    let t = thread::spawn(move || {
+        let mut col = Arc::clone(&shared);
+        println!("Thread Starting");        
+        let mut cam = build_camera();
+        load_calibration(&mut cam);
+        cam.discard_video();        
+        
+        loop {     
+            let value = cam.get_colour(false);      
+            match command_rx.try_recv() {
+                Ok("X") | Err(TryRecvError::Disconnected) => {
+                    println!("Terminating.");
+                    break;
+                }                
+                Ok(&_) | Err(TryRecvError::Empty) => {}
+            }            
+        }
+    });
 
     while !quit {
-        cam.discard_video();
+        
 
         while let Some(event) = context.gilrs.next_event() {
             match event {
@@ -598,6 +852,7 @@ fn do_hubble(context: &mut Context, mut locations: [f32; 4], mut order: [i32; 4]
                 } => {
                     println!("Mode");
                     // Mode to exit
+                    let _ = command_tx.send("X");
                     quit = true;
                     break;
                 }
@@ -606,101 +861,103 @@ fn do_hubble(context: &mut Context, mut locations: [f32; 4], mut order: [i32; 4]
         }
 
         // Main State running or not
-        if running {
-            let mut front_dist = get_distance(&mut front, true);
-            let mut back_dist = get_distance(&mut back, true);
+        //if running {
+            //let mut front_dist = get_distance(&mut front, true);
+            //let mut back_dist = get_distance(&mut back, true);
 
-            let colour = cam.get_colour(true);
-            heading = compass.read_degrees().unwrap();
-            // first time through && locations[index] == 0.0
-            if order[0] == NONE || order[1] == NONE || order[2] == NONE || order[3] == NONE {
-                if colour == RED || colour == BLUE || colour == YELLOW || colour == GREEN {
-                    print_colour(context, colour);
-                    let index = colour as usize;
-                    println!("Index {}", index);
-                    if locations[index] == 0.0 {
-                        control.stop();
-                        println!("Heading {}", heading);
-                        locations[index] = heading;
-                        order[pos] = colour;
-                        print_colour(context, colour);
-                        pos = pos + 1;
-                    }
-                }
-                control.turn_left(TURNING_SPEED, gear);
-            } else {
-                println!("Locations: {:#?}", locations);
-                running = false;
-                for i in RED..GREEN {
-                    let index = i as usize;
-                    println!("Searching for {:#?}", print_colour(context, colour));
-                    align(locations[index], &mut compass, &mut control, &mut cam, 4);
-                    loop {
-                        cam.discard_video();
-                        front_dist = get_distance(&mut front, true);
-                        back_dist = get_distance(&mut back, true);
-                        if front_dist < MIN_DIST {
-                            control.stop();
-                            break;
-                        }
-                        let decel = get_deceleration(front_dist);
-                        let bias = 50;
-                        left_rear_speed = DRIVING_SPEED + bias;
-                        right_rear_speed = DRIVING_SPEED * -1;
-                        left_front_speed = DRIVING_SPEED + bias;
-                        right_front_speed = DRIVING_SPEED * -1;
-                        left_rear_speed = ((left_rear_speed as f64) * decel) as i32;
-                        right_rear_speed = ((right_rear_speed as f64) * decel) as i32;
-                        left_front_speed = ((left_front_speed as f64) * decel) as i32;
-                        right_front_speed = ((right_front_speed as f64) * decel) as i32;
-                        //println!(
-                            //"Forward Speeds lf {:?}, lr {:#?}, rf {:#?}, rr {:#?}",
-                            //left_front_speed, left_rear_speed, right_front_speed, right_rear_speed
+            //let colour = cam.get_colour(true);
+            //heading = compass.read_degrees().unwrap();
+            //// first time through && locations[index] == 0.0
+            //if order[0] == NONE || order[1] == NONE || order[2] == NONE || order[3] == NONE {
+                //if colour == RED || colour == BLUE || colour == YELLOW || colour == GREEN {
+                    //print_colour(context, colour);
+                    //let index = colour as usize;
+                    //println!("Index {}", index);
+                    //if locations[index] == 0.0 {
+                        //control.stop();
+                        //println!("Heading {}", heading);
+                        //locations[index] = heading;
+                        //order[pos] = colour;
+                        //print_colour(context, colour);
+                        //pos = pos + 1;
+                    //}
+                //}
+                //control.turn_left(TURNING_SPEED, gear);
+            //} else {
+                //println!("Locations: {:#?}", locations);
+                //running = false;
+                //for i in RED..GREEN {
+                    //let index = i as usize;
+                    //println!("Searching for {:#?}", print_colour(context, colour));
+                    //align(locations[index], &mut compass, &mut control, &mut cam, 4);
+                    //loop {
+                        //cam.discard_video();
+                        //front_dist = get_distance(&mut front, true);
+                        //back_dist = get_distance(&mut back, true);
+                        //if front_dist < MIN_DIST {
+                            //control.stop();
+                            //break;
+                        //}
+                        //let decel = get_deceleration(front_dist);
+                        //let bias = 50;
+                        //left_rear_speed = DRIVING_SPEED + bias;
+                        //right_rear_speed = DRIVING_SPEED * -1;
+                        //left_front_speed = DRIVING_SPEED + bias;
+                        //right_front_speed = DRIVING_SPEED * -1;
+                        //left_rear_speed = ((left_rear_speed as f64) * decel) as i32;
+                        //right_rear_speed = ((right_rear_speed as f64) * decel) as i32;
+                        //left_front_speed = ((left_front_speed as f64) * decel) as i32;
+                        //right_front_speed = ((right_front_speed as f64) * decel) as i32;
+                        ////println!(
+                            ////"Forward Speeds lf {:?}, lr {:#?}, rf {:#?}, rr {:#?}",
+                            ////left_front_speed, left_rear_speed, right_front_speed, right_rear_speed
+                        ////);
+
+                        //control.speed(
+                            //left_rear_speed,
+                            //right_rear_speed,
+                            //left_front_speed,
+                            //right_front_speed,
                         //);
+                    //}
+                    //println!("Backward");
+                    //loop {
+                        //cam.discard_video();
+                        //front_dist = get_distance(&mut front, true);
+                        //back_dist = get_distance(&mut back, true);
+                        //if front_dist > MAX_DIST {
+                            //control.stop();
+                            //break;
+                        //}
+                        //let decel = get_deceleration(back_dist);
+                        //let bias = 50;
+                        //left_rear_speed = (DRIVING_SPEED + bias) * -1;
+                        //right_rear_speed = DRIVING_SPEED;
+                        //left_front_speed = (DRIVING_SPEED + bias) * -1;
+                        //right_front_speed = DRIVING_SPEED;
+                        //left_rear_speed = ((left_rear_speed as f64) * decel) as i32;
+                        //right_rear_speed = ((right_rear_speed as f64) * decel) as i32;
+                        //left_front_speed = ((left_front_speed as f64) * decel) as i32;
+                        //right_front_speed = ((right_front_speed as f64) * decel) as i32;
+                        ////println!(
+                            ////"Backward Speeds lf {:?}, lr {:#?}, rf {:#?}, rr {:#?}",
+                            ////left_front_speed, left_rear_speed, right_front_speed, right_rear_speed
+                        ////);
 
-                        control.speed(
-                            left_rear_speed,
-                            right_rear_speed,
-                            left_front_speed,
-                            right_front_speed,
-                        );
-                    }
-                    println!("Backward");
-                    loop {
-                        cam.discard_video();
-                        front_dist = get_distance(&mut front, true);
-                        back_dist = get_distance(&mut back, true);
-                        if front_dist > MAX_DIST {
-                            control.stop();
-                            break;
-                        }
-                        let decel = get_deceleration(back_dist);
-                        let bias = 50;
-                        left_rear_speed = (DRIVING_SPEED + bias) * -1;
-                        right_rear_speed = DRIVING_SPEED;
-                        left_front_speed = (DRIVING_SPEED + bias) * -1;
-                        right_front_speed = DRIVING_SPEED;
-                        left_rear_speed = ((left_rear_speed as f64) * decel) as i32;
-                        right_rear_speed = ((right_rear_speed as f64) * decel) as i32;
-                        left_front_speed = ((left_front_speed as f64) * decel) as i32;
-                        right_front_speed = ((right_front_speed as f64) * decel) as i32;
-                        //println!(
-                            //"Backward Speeds lf {:?}, lr {:#?}, rf {:#?}, rr {:#?}",
-                            //left_front_speed, left_rear_speed, right_front_speed, right_rear_speed
+                        //control.speed(
+                            //left_rear_speed,
+                            //right_rear_speed,
+                            //left_front_speed,
+                            //right_front_speed,
                         //);
-
-                        control.speed(
-                            left_rear_speed,
-                            right_rear_speed,
-                            left_front_speed,
-                            right_front_speed,
-                        );
-                    }
-                }
-            }
-        }
+                    //}
+                //}
+            //}
+        //}
+    
     }
 
+    
     control.stop();
     context.display.clear();
     context.pixel.all_off();
@@ -1344,8 +1601,8 @@ fn do_run_tests(context: &mut Context) {
     //load_calibration( &mut cam );
 
     // Test compass
-    let mut compass = HMC5883L::new("/dev/i2c-1").unwrap();
-    println!("Compass started");
+    //let mut compass = HMC5883L::new("/dev/i2c-1").unwrap();
+    //println!("Compass started");
 
     // Test distance sensors group 1 (not always present)
     let mut front = try_open_tof("/dev/i2c-8");
@@ -1357,7 +1614,7 @@ fn do_run_tests(context: &mut Context) {
     let mut leftback = try_open_tof("/dev/i2c-6");
     let mut rightback = try_open_tof("/dev/i2c-9");
 
-    let mut heading = compass.read_degrees().unwrap();
+    //let mut heading = compass.read_degrees().unwrap();
 
     set_continous(&mut back);
     set_continous(&mut leftback);
@@ -1458,7 +1715,7 @@ fn do_run_tests(context: &mut Context) {
                     //println!("North Pressed");
                     //let colour_visible = cam.get_colour( false );
                     let _ = command_tx.send("F");
-                    heading = compass.read_degrees().unwrap();
+                    //heading = compass.read_degrees().unwrap();
                     bk_dist = get_distance(&mut back, true);
                     lb_dist = get_distance(&mut leftback, true);
                     rb_dist = get_distance(&mut rightback, true);
@@ -1468,14 +1725,14 @@ fn do_run_tests(context: &mut Context) {
                     rf_dist = get_distance(&mut rightfront, true);
 
                     context.display.clear();
-                    context
-                        .display
-                        .draw_text(0, 8, "Head:           ", WHITE)
-                        .unwrap();
-                    context
-                        .display
-                        .draw_text(56, 8, &format!("{:5.2} ", heading), WHITE)
-                        .unwrap();
+                    //context
+                        //.display
+                        //.draw_text(0, 8, "Head:           ", WHITE)
+                        //.unwrap();
+                    //context
+                        //.display
+                        //.draw_text(56, 8, &format!("{:5.2} ", heading), WHITE)
+                        //.unwrap();
                     context.display.draw_text(0, 16, "LB:", WHITE).unwrap();
                     context
                         .display
@@ -1516,7 +1773,7 @@ fn do_run_tests(context: &mut Context) {
                 }
             };
         }
-        heading = compass.read_degrees().unwrap();
+        //heading = compass.read_degrees().unwrap();
         ft_dist = get_distance(&mut front, true);
         bk_dist = get_distance(&mut back, true);
         lb_dist = get_distance(&mut leftback, true);
@@ -1524,7 +1781,7 @@ fn do_run_tests(context: &mut Context) {
         lf_dist = get_distance(&mut leftfront, true);
         rf_dist = get_distance(&mut rightfront, true);
 
-        println!("Current Heading      {:5.2}  ", heading);
+        //println!("Current Heading      {:5.2}  ", heading);
         println!("Left Back Distance   {:5.2}  ", lb_dist);
         println!("Back Distance        {:5.2}  ", bk_dist);
         println!("Front Distance       {:5.2}  ", ft_dist);
@@ -1555,10 +1812,12 @@ fn load_calibration(cam: &mut Camera) {
 }
 
 fn do_calibrate(context: &mut Context) {
+    
+    const DIST: u16 = 300;
     context.pixel.all_off();
     context.pixel.render();
 
-    let mut compass = HMC5883L::new("/dev/i2c-1").unwrap();
+    //let mut compass = HMC5883L::new("/dev/i2c-1").unwrap();
     let mut front = try_open_tof("/dev/i2c-8");
     let mut leftfront = try_open_tof("/dev/i2c-5");
     let mut rightfront = try_open_tof("/dev/i2c-10");
@@ -1580,8 +1839,8 @@ fn do_calibrate(context: &mut Context) {
     let mut direction = "Front";
     let mut diff: i32 = 0;
 
-    let original = compass.read_degrees().unwrap();
-    let mut heading = compass.read_degrees().unwrap();
+    //let original = compass.read_degrees().unwrap();
+    //let mut heading = compass.read_degrees().unwrap();
 
     let mut left_rear_speed: i32 = 0;
     let mut right_rear_speed: i32 = 0;
@@ -1598,10 +1857,10 @@ fn do_calibrate(context: &mut Context) {
 
     let mut decel = 0.0;
 
-    println!(
-        "Init Original {:#?}°,  Heading {:#?}° Diff {:#?} Decel {:?}",
-        original, heading, diff, decel
-    );
+    //println!(
+        //"Init Original {:#?}°,  Heading {:#?}° Diff {:#?} Decel {:?}",
+        //original, heading, diff, decel
+    //);
 
     context.pixel.all_on();
     context.pixel.render();
@@ -1694,7 +1953,7 @@ fn do_calibrate(context: &mut Context) {
             if direction == "North" {
                 let bias = 40;
                 distance = front_distance;
-                decel = get_deceleration(distance);
+                decel = get_deceleration(distance, DIST);
                 left_rear_speed = SPEED + bias;
                 right_rear_speed = SPEED * -1;
                 left_front_speed = SPEED + bias;
@@ -1703,7 +1962,7 @@ fn do_calibrate(context: &mut Context) {
             if direction == "South" {
                 let bias = 40;
                 distance = back_distance;
-                decel = get_deceleration(distance);
+                decel = get_deceleration(distance, DIST);
                 left_rear_speed = (SPEED + bias) * -1;
                 right_rear_speed = SPEED;
                 left_front_speed = (SPEED + bias) * -1;
@@ -1715,7 +1974,7 @@ fn do_calibrate(context: &mut Context) {
                 //if distance > DIST {
                 //distance = distance - DIST;
                 //}
-                decel = get_deceleration(distance);
+                decel = get_deceleration(distance, DIST);
                 left_front_speed = SPEED;
                 left_rear_speed = (SPEED + bias) * -1;
                 right_front_speed = SPEED;
@@ -1724,7 +1983,7 @@ fn do_calibrate(context: &mut Context) {
             if direction == "East" {
                 let bias = 30;
                 distance = right_distance;
-                decel = get_deceleration(distance);
+                decel = get_deceleration(distance, DIST);
                 left_front_speed = SPEED * -1;
                 left_rear_speed = SPEED - bias;
                 right_front_speed = SPEED * -1;
@@ -1750,10 +2009,10 @@ fn do_calibrate(context: &mut Context) {
                     right_front_speed,
                 );
 
-                println!(
-                    "Direction {:?} Org {:#?}° Head {:#?}° Decel {:#?},Dist {:?}",
-                    direction, original, heading, decel, distance
-                );
+                //println!(
+                    //"Direction {:?} Org {:#?}° Head {:#?}° Decel {:#?},Dist {:?}",
+                    //direction, original, heading, decel, distance
+                //);
 
                 println!(
                     "Speeds lf {:?}, lr {:#?}, rf {:#?}, rr {:#?}",
