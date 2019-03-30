@@ -543,12 +543,12 @@ fn do_hubble(context: &mut Context, mut locations: [f32; 4], mut order: [i32; 4]
     let mut back_dist = get_distance(&mut back, true);
     
     let mut leftback = try_open_tof("/dev/i2c-6");
-    let mut rightback = try_open_tof("/dev/i2c-9");
+    let mut rightfront = try_open_tof("/dev/i2c-10");
     
     set_continous(&mut leftback);
-    set_continous(&mut rightback);
+    set_continous(&mut rightfront);
     
-    let mut right_dist = get_distance(&mut rightback, true);
+    let mut right_dist = get_distance(&mut rightfront, true);
     let mut left_dist = get_distance(&mut leftback, true);
 
     let mut control = build_control();
@@ -623,7 +623,7 @@ fn do_hubble(context: &mut Context, mut locations: [f32; 4], mut order: [i32; 4]
             let diff: i32 = 0;
 
             front_dist = get_distance(&mut front, true);
-            right_dist = get_distance(&mut rightback, true);
+            right_dist = get_distance(&mut rightfront, true);
             left_dist = get_distance(&mut leftback, true);
             back_dist = get_distance(&mut back, true);
 
